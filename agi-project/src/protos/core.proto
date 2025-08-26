@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package chimera.protos;
+
+// UniversalData is a flexible container for multi-modal data.
+message UniversalData {
+  oneof data_type {
+    string text_data = 1;
+    bytes image_data = 2; // Can be JPG, PNG, etc.
+    string code_data = 3;
+    // Add other data types like audio, video as needed
+  }
+  map<string, string> metadata = 4; // For things like source, timestamp, etc.
+}
+
+// AgentAction represents an action taken by the agent.
+message AgentAction {
+  string tool_name = 1; // e.g., "web_search", "run_shell_command"
+  map<string, UniversalData> tool_args = 2; // Arguments for the tool
+  string rationale = 3; // The agent's reasoning for taking this action.
+}
+
+// Observation represents information received from the environment or tools.
+message Observation {
+  string source_tool = 1; // The tool that generated this observation
+  UniversalData data = 2;
+  bool is_error = 3;
+}

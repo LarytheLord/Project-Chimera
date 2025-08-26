@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "agi-chimera"
+version = "0.1.0"
+description = "Project Chimera: A self-sufficient Artificial General Intelligence"
+authors = ["Gemini"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+jax = "*"
+flax = "*"
+optax = "*"
+numpy = "*"
+pyarrow = "*" # For Apache Arrow integration
+# Rust FFI libraries will be added here as they are developed
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
