@@ -1,5 +1,6 @@
 # This file will contain the main Agent class, which orchestrates the perception-action loop.
 
+import json
 from typing import Any
 
 from ..cognitive_core.interfaces import CognitiveCore
@@ -39,32 +40,35 @@ class Agent:
         {self.tool_registry.get_tool_descriptions()}
         
         Based on the observation and your history, what is your next action?
-        Your response should be a single tool call, like `web_search(query="latest AI research")`.
+        Your response must be a JSON object of the following format:
+        {{
+            "tool_name": "tool_to_call",
+            "arguments": {{
+                "arg1": "value1",
+                "arg2": "value2"
+            }}
+        }}
         """
         
         # 3. Call the cognitive core to get the desired action.
-        # The response from the model is expected to be a string representing a tool call.
-        action_string = self.cognitive_core.generate_response({"text_data": prompt})
+        # The response from the model is expected to be a JSON string.
+        response_json = self.cognitive_core.generate_response({"text_data": prompt})
         
-        # 4. Parse the action string into a structured action.
-        # This is a simplification. A real implementation would use a more robust parser.
-        tool_name, args_str = action_string.strip()[:-1].split('(', 1)
-        # A proper parser would handle args more robustly.
-        args = {"query": args_str.split('=')[1].strip('"')} 
-        
-        # Create a structured action object (using a placeholder for the proto message)
-        action = {"tool_name": tool_name, "tool_args": args}
+        # 4. Parse the JSON response into a structured action.
+        action = json.loads(response_json)
         return action
 
     def _act(self, action: Any) -> Any:
         """Executes the chosen action using the tool registry."""
         try:
-            tool = self.tool_registry.get_tool(action["tool_name"])
-            result = tool(action["tool_args"])
+            tool_name = action["tool_name"]
+            arguments = action["arguments"]
+            tool = self.tool_registry.get_tool(tool_name)
+            result = tool(**arguments)
             # Create a structured observation object
             outcome = {"source_tool": tool.name, "data": {"text_data": result}, "is_error": False}
         except Exception as e:
-            outcome = {"source_tool": action["tool_name"], "data": {"text_data": str(e)}, "is_error": True}
+            outcome = {"source_tool": action.get("tool_name", "unknown_tool"), "data": {"text_data": str(e)}, "is_error": True}
         return outcome
 
     def run_main_loop(self, initial_observation: Any):
@@ -88,9 +92,11 @@ class Agent:
             # The outcome of the last action becomes the new observation for the next loop.
             observation = outcome
 
-            print(f"---
-Observation: {observation}\nAction: {action}\nOutcome: {outcome}
----")
+            print(f"""---
+Observation: {observation}
+Action: {action}
+Outcome: {outcome}
+---""")
 
             # In a real system, there would be a condition to break the loop.
             # For now, we can add a simple check.
