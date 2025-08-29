@@ -1,5 +1,9 @@
 # This file will contain the main Agent class, which orchestrates the perception-action loop.
 
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import json
 from typing import Any
 
@@ -8,7 +12,7 @@ from .memory import WorkingMemory, EpisodicMemory, Experience
 from .tool_user import ToolRegistry, Tool
 
 # Placeholder for protobuf messages
-# from ..protos import core_pb2
+# from protos import core_pb2
 
 class Agent:
     """The main agent class that orchestrates the AGI's operation."""
