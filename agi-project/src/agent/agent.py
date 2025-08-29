@@ -108,11 +108,7 @@ class Agent:
             # The outcome of the last action becomes the new observation for the next loop.
             observation = outcome
 
-            print(f"""---
-Observation: {observation}
-Action: {action}
-Outcome: {outcome}
----""")
+            print(f"""---Observation: {observation}Action: {action}Outcome: {outcome}---""")
 
             # In a real system, there would be a condition to break the loop.
             # For now, we can add a simple check.
