@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from ..cognitive_core.interfaces import CognitiveCore
+from cognitive_core.interfaces import CognitiveCore
 from .memory import WorkingMemory, EpisodicMemory, Experience
 from .tool_user import ToolRegistry, Tool
 
@@ -13,24 +13,27 @@ from .tool_user import ToolRegistry, Tool
 class Agent:
     """The main agent class that orchestrates the AGI's operation."""
 
-    def __init__(self, cognitive_core: CognitiveCore, tool_registry: ToolRegistry):
+    def __init__(self, cognitive_core: CognitiveCore, tool_registry: ToolRegistry, memory_filepath: str = None):
         self.cognitive_core = cognitive_core
         self.tool_registry = tool_registry
         self.working_memory = WorkingMemory()
-        self.episodic_memory = EpisodicMemory()
+        self.episodic_memory = EpisodicMemory(filepath=memory_filepath)
 
     def _think(self, observation: Any) -> Any:
         """Uses the cognitive core to decide on the next action."""
         # 1. Get context from working memory and relevant memories from episodic memory.
         context = self.working_memory.get_context()
-        # recalled_memories = self.episodic_memory.recall(observation.data.text_data)
+        recalled_memories = self.episodic_memory.recall(observation.get('data', {}).get('text_data', '')) # Recall based on observation text
         
         # 2. Format this into a prompt for the cognitive core.
         # This is a critical step. The prompt needs to instruct the model to act as an agent.
         prompt = f"""
         You are an autonomous agent. Here is the current situation:
         
-        **Recent History:**
+        **Recalled Experiences (from long-term memory):**
+        {recalled_memories}
+
+        **Recent History (from working memory):**
         {context}
         
         **Current Observation:**
@@ -39,7 +42,7 @@ class Agent:
         **Available Tools:**
         {self.tool_registry.get_tool_descriptions()}
         
-        Based on the observation and your history, what is your next action?
+        Based on the observation, your history, and your recalled experiences, what is your next action?
         Your response must be a JSON object of the following format:
         {{
             "tool_name": "tool_to_call",
@@ -55,7 +58,16 @@ class Agent:
         response_json = self.cognitive_core.generate_response({"text_data": prompt})
         
         # 4. Parse the JSON response into a structured action.
-        action = json.loads(response_json)
+        try:
+            action = json.loads(response_json)
+        except json.JSONDecodeError:
+            # Handle cases where the model's output is not valid JSON
+            # For now, we'll create an error action. A more sophisticated approach
+            # could involve asking the model to correct its output.
+            action = {
+                "tool_name": "error_handler",
+                "arguments": {"error_message": "Invalid JSON response from cognitive core."}
+            }
         return action
 
     def _act(self, action: Any) -> Any:

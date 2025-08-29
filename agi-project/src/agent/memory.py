@@ -1,5 +1,6 @@
 # This file will define the agent's memory systems.
 
+import json
 from typing import List, Tuple, Any, NamedTuple
 from collections import deque
 
@@ -37,12 +38,17 @@ class EpisodicMemory:
     to allow for efficient similarity-based retrieval of relevant memories.
     """
 
-    def __init__(self):
+    def __init__(self, filepath: str = None):
         self.experiences: List[Experience] = []
+        self.filepath = filepath
+        if self.filepath:
+            self.load_from_file(self.filepath)
 
     def remember(self, experience: Experience):
-        """Stores a new experience in long-term memory."""
+        """Stores a new experience in long-term memory and saves it if a file is configured."""
         self.experiences.append(experience)
+        if self.filepath:
+            self.save_to_file(self.filepath, experience)
 
     def recall(self, query: str, top_k: int = 5) -> List[Experience]:
         """Recalls the most relevant experiences based on a query.
@@ -59,3 +65,20 @@ class EpisodicMemory:
                     relevant_experiences.append(exp)
         
         return relevant_experiences[-top_k:] # Return the most recent k matches
+
+    def save_to_file(self, filepath: str, experience: Experience):
+        """Appends a single experience to the JSONL file."""
+        with open(filepath, 'a') as f:
+            f.write(json.dumps(experience._asdict()) + '\n')
+
+    def load_from_file(self, filepath: str):
+        """Loads experiences from a JSONL file."""
+        try:
+            with open(filepath, 'r') as f:
+                for line in f:
+                    data = json.loads(line)
+                    self.experiences.append(Experience(**data))
+        except FileNotFoundError:
+            # It's okay if the file doesn't exist yet.
+            pass
+

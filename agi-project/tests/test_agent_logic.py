@@ -1,12 +1,16 @@
 
-import json
 import sys
 import os
+
+# Add the 'src' directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
+import json
 from typing import Any, Dict
 
 
-
 from agent.agent import Agent
+from agent.memory import Experience
 from agent.tool_user import Tool, ToolRegistry
 from cognitive_core.interfaces import CognitiveCore
 
@@ -18,78 +22,104 @@ class MockCognitiveCore(CognitiveCore):
         self.action_json = action_json
 
     def generate_response(self, prompt: Dict[str, str]) -> str:
-        # In a real scenario, this would involve an LLM call.
-        # Here, we just return the predefined action as a JSON string.
         return json.dumps(self.action_json)
 
-def sum_numbers(a: int, b: int) -> int:
+    def load_model(self, model_path: str):
+        pass
+
+    def train(self, dataset: Any):
+        pass
+
+    def get_state(self) -> Any:
+        pass
+
+class SumTool(Tool):
     """A simple tool that adds two numbers."""
-    return a + b
+    @property
+    def name(self) -> str:
+        return "sum_numbers"
+
+    @property
+    def description(self) -> str:
+        return "Adds two integers a and b."
+
+    def __call__(self, a: int, b: int) -> Any:
+        return a + b
 
 # --- Test Fixture ---
 
-def setup_agent_for_test():
+def setup_agent_for_test(memory_filepath: str = None):
     """Sets up the agent with mock components for a predictable test."""
-    # 1. Define the mock action the LLM will be simulated to return.
     mock_action = {
         "tool_name": "sum_numbers",
         "arguments": {"a": 5, "b": 10}
     }
-    
-    # 2. Create the mock cognitive core.
     mock_core = MockCognitiveCore(action_json=mock_action)
 
-    # 3. Create and register a simple tool.
-    sum_tool = Tool(name="sum_numbers", func=sum_numbers, description="Adds two integers a and b.")
+    sum_tool = SumTool()
     tool_registry = ToolRegistry()
     tool_registry.register_tool(sum_tool)
 
-    # 4. Instantiate the agent with the mock components.
-    agent = Agent(cognitive_core=mock_core, tool_registry=tool_registry)
-    
+    agent = Agent(
+        cognitive_core=mock_core,
+        tool_registry=tool_registry,
+        memory_filepath=memory_filepath
+    )
     return agent
 
 # --- The Test ---
 
-def test_agent_think_act_loop():
+def test_agent_think_act_loop_and_memory_persistence():
     """
-    Tests one full cycle of the agent's perceive-think-act loop.
-    It verifies that the agent correctly parses the mock LLM response,
-    calls the appropriate tool with the correct arguments, and processes the result.
+    Tests one full cycle of the agent's perceive-think-act loop and memory persistence.
     """
-    # 1. Setup
-    agent = setup_agent_for_test()
+    MEMORY_FILE = "test_agent_memory.json"
+    if os.path.exists(MEMORY_FILE):
+        os.remove(MEMORY_FILE)
+
+    # 1. Setup the first agent and run a cycle
+    agent1 = setup_agent_for_test(memory_filepath=MEMORY_FILE)
     initial_observation = {"source": "user", "data": {"text_data": "What is 5 + 10?"}}
     
-    # We need to manually step through the loop to inspect the intermediate objects.
-    
-    # 2. Think
-    # The agent observes the initial input and thinks about the next action.
-    agent.working_memory.add(initial_observation)
-    action = agent._think(initial_observation)
-    
-    # Assert the action was parsed correctly
+    # We are not testing the full loop here, but the components
+    # Think
+    action = agent1._think(initial_observation)
     expected_action = {
         "tool_name": "sum_numbers",
         "arguments": {"a": 5, "b": 10}
     }
     assert action == expected_action
     
-    # 3. Act
-    # The agent executes the action.
-    agent.working_memory.add(action)
-    outcome = agent._act(action)
-
-    # Assert the outcome is correct
+    # Act
+    outcome = agent1._act(action)
     expected_outcome = {
-        'source_tool': 'sum_numbers', 
-        'data': {'text_data': 15}, 
+        'source_tool': 'sum_numbers',
+        'data': {'text_data': 15},
         'is_error': False
     }
     assert outcome == expected_outcome
+
+    # Remember
+    experience = Experience(observation=initial_observation, action=action, outcome=outcome)
+    agent1.episodic_memory.remember(experience)
+
+
+    # 2. Create a second agent and verify memory is loaded
+    agent2 = setup_agent_for_test(memory_filepath=MEMORY_FILE)
     
-    print("Agent think-act cycle test passed successfully!")
+    # Verify that the second agent has loaded the history from the first agent.
+    assert len(agent2.episodic_memory.experiences) == 1
+    loaded_experience = agent2.episodic_memory.experiences[0]
+    
+    # We need to convert namedtuple to tuple for comparison
+    assert tuple(loaded_experience) == experience
+
+    # --- Cleanup ---
+    if os.path.exists(MEMORY_FILE):
+        os.remove(MEMORY_FILE)
+    
+    print("Agent think-act-memory cycle test passed successfully!")
 
 if __name__ == "__main__":
-    test_agent_think_act_loop()
+    test_agent_think_act_loop_and_memory_persistence()
 

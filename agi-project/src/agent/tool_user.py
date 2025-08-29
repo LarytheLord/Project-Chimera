@@ -44,6 +44,12 @@ class ToolRegistry:
             raise ValueError(f"Tool with name '{name}' not found.")
         return self._tools[name]
 
+    def unregister_tool(self, name: str):
+        """Unregisters a tool."""
+        if name not in self._tools:
+            raise ValueError(f"Tool with name '{name}' not found.")
+        del self._tools[name]
+
     def get_tool_descriptions(self) -> str:
         """Returns a formatted string of all tool names and descriptions."""
         return "\n".join([f"- {name}: {tool.description}" for name, tool in self._tools.items()])
