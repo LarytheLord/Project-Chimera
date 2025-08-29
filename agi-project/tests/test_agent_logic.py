@@ -32,9 +32,6 @@ class MockCognitiveCore(CognitiveCore):
 
     def get_state(self) -> Any:
         pass
-
-class SumTool(Tool):
-    """A simple tool that adds two numbers."""
     @property
     def name(self) -> str:
         return "sum_numbers"
