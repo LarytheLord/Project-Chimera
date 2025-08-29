@@ -18,7 +18,7 @@ class MockCognitiveCore(CognitiveCore):
     def load_model(self, model_path: str):
         print(f"Mock model loaded from {model_path}")
 
-    def generate_response(self, inputs: Dict[str, Any]) -> str:
+    def generate_response(self, inputs: dict[str, any]) -> str:
         # This is where the magic happens in a real model.
         # For now, we'll return a pre-defined action to test the loop.
         print("\n--- Cognitive Core received prompt: ---")
@@ -26,10 +26,10 @@ class MockCognitiveCore(CognitiveCore):
         print("--- End of prompt ---\n")
         return 'web_search(query="latest AGI research")'
 
-    def train(self, dataset: Any):
+    def train(self, dataset: any):
         print("Mock model is being trained.")
 
-    def get_state(self) -> Any:
+    def get_state(self) -> any:
         return {"mock_weights": [1, 2, 3]}
 
 # --- Main Application ---
