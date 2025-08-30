@@ -3,7 +3,6 @@
 import abc
 from typing import Dict, Any, List
 from googlesearch import search
-
 # Placeholder for protobuf messages
 # from ..protos import core_pb2
 
