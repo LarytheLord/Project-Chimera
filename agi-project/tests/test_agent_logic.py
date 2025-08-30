@@ -2,6 +2,7 @@
 import sys
 import os
 
+
 # Add the 'src' directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
@@ -12,6 +13,7 @@ from typing import Any, Dict
 from agent.agent import Agent
 from agent.memory import Experience
 from agent.tool_user import Tool, ToolRegistry
+
 from cognitive_core.interfaces import CognitiveCore
 
 # --- Mock Components ---
@@ -32,9 +34,6 @@ class MockCognitiveCore(CognitiveCore):
 
     def get_state(self) -> Any:
         pass
-
-class SumTool(Tool):
-    """A simple tool that adds two numbers."""
     @property
     def name(self) -> str:
         return "sum_numbers"
@@ -122,4 +121,8 @@ def test_agent_think_act_loop_and_memory_persistence():
 
 if __name__ == "__main__":
     test_agent_think_act_loop_and_memory_persistence()
+
+
+
+
 

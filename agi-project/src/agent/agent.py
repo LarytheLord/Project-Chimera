@@ -1,14 +1,18 @@
 # This file will contain the main Agent class, which orchestrates the perception-action loop.
 
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import json
 from typing import Any
 
 from cognitive_core.interfaces import CognitiveCore
-from .memory import WorkingMemory, EpisodicMemory, Experience
-from .tool_user import ToolRegistry, Tool
+from memory import WorkingMemory, EpisodicMemory, Experience
+from tool_user import ToolRegistry, Tool, WebSearchTool
 
 # Placeholder for protobuf messages
-# from ..protos import core_pb2
+# from protos import core_pb2
 
 class Agent:
     """The main agent class that orchestrates the AGI's operation."""
@@ -104,14 +108,52 @@ class Agent:
             # The outcome of the last action becomes the new observation for the next loop.
             observation = outcome
 
-            print(f"""---
-Observation: {observation}
-Action: {action}
-Outcome: {outcome}
----""")
+            print(f"""---Observation: {observation}Action: {action}Outcome: {outcome}---""")
 
             # In a real system, there would be a condition to break the loop.
             # For now, we can add a simple check.
             if "exit" in action.get("tool_name", ""):
                 print("Exit condition met. Shutting down agent loop.")
                 break
+
+if __name__ == '__main__':
+    # This is a mock cognitive core for demonstration purposes.
+    # In a real system, this would be a sophisticated model.
+    class MockCognitiveCore(CognitiveCore):
+        def generate_response(self, prompt: Any) -> str:
+            # For this example, we'll just return a fixed action.
+            action = {
+                "tool_name": "web_search",
+                "arguments": {"query": "what is the meaning of life?"}
+            }
+            return json.dumps(action)
+
+        def get_state(self):
+            pass
+
+        def load_model(self):
+            pass
+
+        def train(self):
+            pass
+
+    # Set up the tool registry
+    tool_registry = ToolRegistry()
+    tool_registry.register_tool(WebSearchTool())
+
+    # Instantiate the agent
+    agent = Agent(
+        cognitive_core=MockCognitiveCore(),
+        tool_registry=tool_registry,
+        memory_filepath="episodic_memory.jsonl"
+    )
+
+    # Provide an initial observation
+    initial_observation = {
+        "source": "user",
+        "data": {"text_data": "What is the meaning of life?"},
+        "is_error": False
+    }
+
+    # Run the agent's main loop
+    agent.run_main_loop(initial_observation)
