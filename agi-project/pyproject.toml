@@ -11,6 +11,7 @@ flax = "*"
 optax = "*"
 numpy = "*"
 pyarrow = "*" # For Apache Arrow integration
+httpx = "*" # For making HTTP requests
 # Rust FFI libraries will be added here as they are developed
 
 [tool.poetry.group.dev.dependencies]

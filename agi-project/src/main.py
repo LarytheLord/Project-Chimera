@@ -7,40 +7,33 @@ import os
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
-from src.cognitive_core.interfaces import CognitiveCore
+from src.cognitive_core.prometheus_core import PrometheusCognitiveCore
 from src.agent.tool_user import ToolRegistry, WebSearchTool
 from src.agent.agent import Agent
-
-# --- Mock Implementation for Testing ---
-
-class MockCognitiveCore(CognitiveCore):
-    """A mock implementation of the Cognitive Core for testing the agent loop."""
-    def load_model(self, model_path: str):
-        print(f"Mock model loaded from {model_path}")
-
-    def generate_response(self, inputs: dict[str, any]) -> str:
-        # This is where the magic happens in a real model.
-        # For now, we'll return a pre-defined action to test the loop.
-        print("\n--- Cognitive Core received prompt: ---")
-        print(inputs.get("text_data"))
-        print("--- End of prompt ---\n")
-        return 'web_search(query="latest AGI research")'
-
-    def train(self, dataset: any):
-        print("Mock model is being trained.")
-
-    def get_state(self) -> any:
-        return {"mock_weights": [1, 2, 3]}
 
 # --- Main Application ---
 
 def main():
     """Initializes and runs the AGI agent."""
-    print("Initializing Project Chimera...")
+    print("Initializing Project Chimera with the Prometheus Engine...")
 
     # 1. Set up the Cognitive Core
-    cognitive_core = MockCognitiveCore()
-    cognitive_core.load_model("/path/to/mock/weights")
+    # IMPORTANT: You need to set the GEMINI_API_KEY environment variable for this to work.
+    # For example, in your shell:
+    # export GEMINI_API_KEY='your_api_key_here'
+    #
+    # You will also need to replace the api_url with the correct one for your model.
+    try:
+        cognitive_core = PrometheusCognitiveCore(
+            api_url="https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+        )
+        cognitive_core.load_model("gemini-pro")
+    except ValueError as e:
+        print(f"\n--- CONFIGURATION ERROR ---")
+        print(f"Error initializing the cognitive core: {e}")
+        print("Please make sure the GEMINI_API_KEY environment variable is set correctly.")
+        print("---")
+        return
 
     # 2. Set up the Tool Registry
     tool_registry = ToolRegistry()
