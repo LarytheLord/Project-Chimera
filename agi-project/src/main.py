@@ -2,6 +2,7 @@
 
 import sys
 import os
+import json
 
 # Add the project root to the Python path to resolve imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -24,9 +25,14 @@ class MockCognitiveCore(CognitiveCore):
         print("\n--- Cognitive Core received prompt: ---")
         print(inputs.get("text_data"))
         print("--- End of prompt ---\n")
-        return 'web_search(query="latest AGI research")'
+        action = {
+            "tool_name": "web_search",
+            "arguments": {"query": "latest AGI research"}
+        }
+        return json.dumps(action)
 
     def train(self, dataset: any):
+
         print("Mock model is being trained.")
 
     def get_state(self) -> any:

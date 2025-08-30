@@ -2,6 +2,7 @@
 
 import abc
 from typing import Dict, Any, List
+from googlesearch import search
 
 # Placeholder for protobuf messages
 # from ..protos import core_pb2
@@ -73,5 +74,9 @@ class WebSearchTool(Tool):
             return "Error: Missing required argument 'query'."
         
         print(f"--- EXECUTING WEB SEARCH: {query} ---")
-        # In a real implementation, this would call a search API.
-        return f"Results for '{query}': 1. The sky is blue. 2. Water is wet."
+        try:
+            search_results = search(query, num=5, stop=5, pause=2)
+            results = [str(r) for r in search_results]
+            return f"Results for '{query}':\n" + "\n".join(results)
+        except Exception as e:
+            return f"Error during web search: {e}"
