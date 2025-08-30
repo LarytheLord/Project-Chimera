@@ -21,7 +21,7 @@ class Agent:
         self.cognitive_core = cognitive_core
         self.tool_registry = tool_registry
         self.working_memory = WorkingMemory()
-        self.episodic_memory = EpisodicMemory(filepath=memory_filepath)
+        self.episodic_memory = EpisodicMemory(filepath="file.txt")
 
     def _think(self, observation: Any) -> Any:
         """Uses the cognitive core to decide on the next action."""

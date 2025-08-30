@@ -38,9 +38,9 @@ class EpisodicMemory:
     to allow for efficient similarity-based retrieval of relevant memories.
     """
 
-    def __init__(self, filepath: str = None):
+    def __init__(self, filepath):
         self.experiences: List[Experience] = []
-        self.filepath = filepath
+        self.filepath = str(filepath)
         if self.filepath:
             self.load_from_file(self.filepath)
 
@@ -74,7 +74,7 @@ class EpisodicMemory:
     def load_from_file(self, filepath: str):
         """Loads experiences from a JSONL file."""
         try:
-            with open('file.txt', 'a') as f:
+            with open(filepath, 'r') as f:
                 for line in f:
                     data = json.loads(line)
                     self.experiences.append(Experience(**data))
