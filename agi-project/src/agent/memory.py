@@ -74,7 +74,7 @@ class EpisodicMemory:
     def load_from_file(self, filepath: str):
         """Loads experiences from a JSONL file."""
         try:
-            with open('file.txt', 'r') as f:
+            with open('file.txt', 'a') as f:
                 for line in f:
                     data = json.loads(line)
                     self.experiences.append(Experience(**data))
