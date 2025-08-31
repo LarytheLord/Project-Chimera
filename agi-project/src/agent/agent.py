@@ -1,40 +1,35 @@
-# This file will contain the main Agent class, which orchestrates the perception-action loop.
-
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import json
-from typing import Any
+from typing import Any, List
 
 from cognitive_core.interfaces import CognitiveCore
-from memory import WorkingMemory, EpisodicMemory, Experience
-from tool_user import ToolRegistry, Tool, WebSearchTool
-
-# Placeholder for protobuf messages
-# from protos import core_pb2
+from agent.memory import WorkingMemory, VectorEpisodicMemory, Experience
+from agent.tool_user import ToolRegistry, Tool, WebSearchTool
+from rlhf.oracle import RLHFOracle
 
 class Agent:
     """The main agent class that orchestrates the AGI's operation."""
 
-    def __init__(self, cognitive_core: CognitiveCore, tool_registry: ToolRegistry, memory_filepath: str = None):
+    def __init__(self, cognitive_core: CognitiveCore, tool_registry: ToolRegistry, db_path: str, rlhf_oracle: RLHFOracle = None, num_candidates: int = 3):
         self.cognitive_core = cognitive_core
         self.tool_registry = tool_registry
         self.working_memory = WorkingMemory()
-        self.episodic_memory = EpisodicMemory(filepath="file.txt")
+        self.episodic_memory = VectorEpisodicMemory(db_path=db_path)
+        self.rlhf_oracle = rlhf_oracle
+        self.num_candidates = num_candidates
 
     def _think(self, observation: Any) -> Any:
-        """Uses the cognitive core to decide on the next action."""
+        """Uses the cognitive core and RLHF oracle to decide on the best next action."""
         # 1. Get context from working memory and relevant memories from episodic memory.
         context = self.working_memory.get_context()
-        recalled_memories = self.episodic_memory.recall(observation.get('data', {}).get('text_data', '')) # Recall based on observation text
+        query_text = json.dumps(observation)
+        recalled_memories = self.episodic_memory.recall(query_text)
         
-        # 2. Format this into a prompt for the cognitive core.
-        # This is a critical step. The prompt needs to instruct the model to act as an agent.
+        # 2. Format the prompt for the cognitive core.
         prompt = f"""
         You are an autonomous agent. Here is the current situation:
         
-        **Recalled Experiences (from long-term memory):**
+        **Recalled Experiences (from long-term vector memory):**
         {recalled_memories}
 
         **Recent History (from working memory):**
@@ -57,20 +52,32 @@ class Agent:
         }}
         """
         
-        # 3. Call the cognitive core to get the desired action.
-        # The response from the model is expected to be a JSON string.
-        response_json = self.cognitive_core.generate_response({"text_data": prompt})
-        
-        # 4. Parse the JSON response into a structured action.
+        # 3. Generate multiple candidate actions.
+        if self.rlhf_oracle and self.num_candidates > 1:
+            print(f"\n--- Generating {self.num_candidates} candidate actions ---")
+            candidates = [self.cognitive_core.generate_response({"text_data": prompt}, temperature=0.9) for _ in range(self.num_candidates)]
+            
+            # 4. Consult the RLHF Oracle to choose the best action.
+            print("--- Consulting RLHF Oracle to select best action ---")
+            best_action_json = self.rlhf_oracle.get_best_response(prompt, candidates)
+            print(f"--- Oracle chose best action: {best_action_json} ---")
+            
+            # (Future Work): Here, we can implement the automated preference pair generation.
+            # The `best_action_json` is the "chosen" response, and a random other candidate
+            # can be the "rejected" one. This pair can be saved to preference_data.jsonl
+            # to continuously improve the reward model.
+
+        else:
+            # Fallback to single generation if oracle is not present.
+            best_action_json = self.cognitive_core.generate_response({"text_data": prompt})
+
+        # 5. Parse the chosen JSON response into a structured action.
         try:
-            action = json.loads(response_json)
-        except json.JSONDecodeError:
-            # Handle cases where the model's output is not valid JSON
-            # For now, we'll create an error action. A more sophisticated approach
-            # could involve asking the model to correct its output.
+            action = json.loads(best_action_json)
+        except (json.JSONDecodeError, TypeError):
             action = {
                 "tool_name": "error_handler",
-                "arguments": {"error_message": "Invalid JSON response from cognitive core."}
+                "arguments": {"error_message": "Invalid JSON response from cognitive core or oracle."}
             }
         return action
 
@@ -81,7 +88,6 @@ class Agent:
             arguments = action["arguments"]
             tool = self.tool_registry.get_tool(tool_name)
             result = tool(**arguments)
-            # Create a structured observation object
             outcome = {"source_tool": tool.name, "data": {"text_data": result}, "is_error": False}
         except Exception as e:
             outcome = {"source_tool": action.get("tool_name", "unknown_tool"), "data": {"text_data": str(e)}, "is_error": True}
@@ -93,67 +99,19 @@ class Agent:
         self.working_memory.add(observation)
 
         while True: # The loop runs continuously
-            # 1. Think: Decide on the next action.
             action = self._think(observation)
             self.working_memory.add(action)
 
-            # 2. Act: Execute the action.
             outcome = self._act(action)
             self.working_memory.add(outcome)
 
-            # 3. Remember: Store the full experience.
             experience = Experience(observation=observation, action=action, outcome=outcome)
             self.episodic_memory.remember(experience)
 
-            # The outcome of the last action becomes the new observation for the next loop.
             observation = outcome
 
-            print(f"""---Observation: {observation}Action: {action}Outcome: {outcome}---""")
+            print(f"---Observation: {observation}\nAction: {action}\nOutcome: {outcome}---")
 
-            # In a real system, there would be a condition to break the loop.
-            # For now, we can add a simple check.
             if "exit" in action.get("tool_name", ""):
                 print("Exit condition met. Shutting down agent loop.")
                 break
-
-if __name__ == '__main__':
-    # This is a mock cognitive core for demonstration purposes.
-    # In a real system, this would be a sophisticated model.
-    class MockCognitiveCore(CognitiveCore):
-        def generate_response(self, prompt: Any) -> str:
-            # For this example, we'll just return a fixed action.
-            action = {
-                "tool_name": "web_search",
-                "arguments": {"query": "what is the meaning of life?"}
-            }
-            return json.dumps(action)
-
-        def get_state(self):
-            pass
-
-        def load_model(self):
-            pass
-
-        def train(self):
-            pass
-
-    # Set up the tool registry
-    tool_registry = ToolRegistry()
-    tool_registry.register_tool(WebSearchTool())
-
-    # Instantiate the agent
-    agent = Agent(
-        cognitive_core=MockCognitiveCore(),
-        tool_registry=tool_registry,
-        memory_filepath="episodic_memory.jsonl"
-    )
-
-    # Provide an initial observation
-    initial_observation = {
-        "source": "user",
-        "data": {"text_data": "What is the meaning of life?"},
-        "is_error": False
-    }
-
-    # Run the agent's main loop
-    agent.run_main_loop(initial_observation)

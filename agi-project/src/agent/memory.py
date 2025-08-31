@@ -1,8 +1,13 @@
 # This file will define the agent's memory systems.
 
 import json
-from typing import List, Tuple, Any, NamedTuple
+from typing import List, Any, NamedTuple
 from collections import deque
+import lancedb
+from sentence_transformers import SentenceTransformer
+import pandas as pd
+import pyarrow as pa
+import os
 
 # Placeholder for protobuf messages
 # from ..protos import core_pb2
@@ -31,54 +36,78 @@ class WorkingMemory:
         """Clears the working memory."""
         self.history.clear()
 
-class EpisodicMemory:
-    """Manages the agent's long-term, searchable memory of past experiences.
-    
-    In a real implementation, this would be backed by a vector database like ChromaDB or Pinecone
-    to allow for efficient similarity-based retrieval of relevant memories.
-    """
+class VectorEpisodicMemory:
+    """Manages the agent's long-term, searchable memory of past experiences using a vector database."""
 
-    def __init__(self, filepath):
-        self.experiences: List[Experience] = []
-        self.filepath = str(filepath)
-        if self.filepath:
-            self.load_from_file(self.filepath)
+    def __init__(self, db_path: str, table_name: str = "experiences"):
+        """
+        Initializes the vector-based episodic memory.
+
+        Args:
+            db_path: Path to the LanceDB database directory.
+            table_name: Name of the table to store experiences.
+        """
+        print("Initializing VectorEpisodicMemory...")
+        # Use a lightweight, high-performance model suitable for local execution
+        self.model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu') # Force CPU usage
+        
+        db_uri = os.path.join(db_path, "lancedb")
+        os.makedirs(db_uri, exist_ok=True)
+        db = lancedb.connect(db_uri)
+        
+        self.table = self._get_or_create_table(db, table_name)
+        print("VectorEpisodicMemory initialized successfully.")
+
+    def _get_or_create_table(self, db, table_name):
+        if table_name in db.table_names():
+            return db.open_table(table_name)
+        else:
+            embedding_dim = self.model.get_sentence_embedding_dimension()
+            schema = pa.schema([
+                pa.field("vector", pa.list_(pa.float32(), embedding_dim)),
+                pa.field("observation_text", pa.string()),
+                pa.field("action_text", pa.string()),
+                pa.field("outcome_text", pa.string())
+            ])
+            return db.create_table(table_name, schema=schema)
+
+    def _experience_to_text(self, experience: Experience) -> str:
+        """Converts an Experience object into a single string for embedding."""
+        obs = json.dumps(experience.observation)
+        act = json.dumps(experience.action)
+        out = json.dumps(experience.outcome)
+        return f"Observation: {obs}\nAction: {act}\nOutcome: {out}"
 
     def remember(self, experience: Experience):
-        """Stores a new experience in long-term memory and saves it if a file is configured."""
-        self.experiences.append(experience)
-        if self.filepath:
-            self.save_to_file(self.filepath, experience)
+        """Stores a new experience in the vector database."""
+        text_to_embed = self._experience_to_text(experience)
+        vector = self.model.encode(text_to_embed).tolist()
+
+        data = {
+            "vector": vector,
+            "observation_text": json.dumps(experience.observation),
+            "action_text": json.dumps(experience.action),
+            "outcome_text": json.dumps(experience.outcome)
+        }
+        self.table.add([data])
+        print(f"--- Remembered new experience ---")
 
     def recall(self, query: str, top_k: int = 5) -> List[Experience]:
-        """Recalls the most relevant experiences based on a query.
+        """Recalls the most relevant experiences based on semantic similarity."""
+        if self.table.count_rows() == 0:
+            return []
+            
+        query_vector = self.model.encode(query).tolist()
+        results = self.table.search(query_vector).limit(top_k).to_df()
+
+        recalled_experiences = []
+        for _, row in results.iterrows():
+            exp = Experience(
+                observation=json.loads(row['observation_text']),
+                action=json.loads(row['action_text']),
+                outcome=json.loads(row['outcome_text'])
+            )
+            recalled_experiences.append(exp)
         
-        This is a simplified keyword-based search. A real implementation would use
-        vector embeddings of the query and experiences to find semantic similarity.
-        """
-        # Naive search for demonstration purposes
-        relevant_experiences = []
-        for exp in self.experiences:
-            # Pretend we are searching inside the observation text
-            if hasattr(exp.observation, 'data') and hasattr(exp.observation.data, 'text_data'):
-                if query in exp.observation.data.text_data:
-                    relevant_experiences.append(exp)
-        
-        return relevant_experiences[-top_k:] # Return the most recent k matches
-
-    def save_to_file(self, filepath: str, experience: Experience):
-        """Appends a single experience to the JSONL file."""
-        with open(filepath, 'a') as f:
-            f.write(json.dumps(experience._asdict()) + '\n')
-
-    def load_from_file(self, filepath: str):
-        """Loads experiences from a JSONL file."""
-        try:
-            with open(filepath, 'r') as f:
-                for line in f:
-                    data = json.loads(line)
-                    self.experiences.append(Experience(**data))
-        except FileNotFoundError:
-            # It's okay if the file doesn't exist yet.
-            pass
-
+        print(f"--- Recalled {len(recalled_experiences)} experiences for query: '{query}' ---")
+        return recalled_experiences

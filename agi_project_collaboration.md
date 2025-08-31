@@ -72,3 +72,32 @@ We have updated the test harness to accommodate the new memory persistence funct
 -   **Document changes:** Update relevant documentation for any significant changes.
 
 Let's build something extraordinary together!
+
+### RLHF with Experiential Self-Critique: Towards Autonomous Learning
+
+We have implemented an innovative Reinforcement Learning from Human Feedback (RLHF) system designed to enable the agent to learn and improve its behavior with minimal direct human supervision. This approach, termed "Experiential Self-Critique," allows the agent to leverage its own experiences to refine its actions.
+
+**Key Components & Workflow:**
+
+1.  **Preference Data Collection (`scripts/collect_preferences.py`):
+    *   An interactive script allows human users to provide prompts and choose between two agent-generated responses (one "chosen," one "rejected"). This initial human feedback seeds the system with basic preferences.
+
+2.  **Reward Model (`src/rlhf/reward_model.py`):
+    *   A lightweight `distilbert-base-uncased` model is fine-tuned on the collected preference data. This model learns to assign a scalar "reward score" to any given (prompt, response) pair, reflecting human preferences.
+    *   A dedicated script (`scripts/train_reward_model.py`) orchestrates the training of this model.
+
+3.  **RLHF Oracle (`src/rlhf/oracle.py`):
+    *   This component loads the trained Reward Model and acts as an "oracle" for the agent. It can score individual responses and, crucially, select the best response from a list of candidates based on the learned preferences.
+
+4.  **Agent Integration (`src/agent/agent.py`):
+    *   The agent's `_think` process has been enhanced:
+        *   For a given observation, the agent now generates multiple candidate actions/responses.
+        *   It then consults the `RLHFOracle` to evaluate these candidates and select the one with the highest reward score.
+        *   *(Future Work: Automated Preference Generation)* This selected "best" response can then be automatically paired with a "rejected" (lower-scoring) candidate to generate new preference data, which can be fed back into the Reward Model training, creating a continuous, self-improving learning loop.
+
+**Why this Stands Out (The "Chimera" Approach):**
+
+*   **Reduced Human Bottleneck:** By enabling the agent to critique its own generated responses using the Reward Model, we significantly reduce the need for extensive manual human labeling, making the learning process more scalable.
+*   **Leverages Existing Memory:** The system intelligently integrates with the `VectorEpisodicMemory`, allowing the agent to draw upon past experiences during its self-critique process.
+*   **Resource-Efficient:** All components are designed to run efficiently on CPU-only hardware, adhering to our project's resource constraints.
+*   **Path to Autonomous Learning:** This architecture lays the groundwork for the agent to become more introspective and autonomously improve its decision-making and behavior over time, aligning with the long-term vision of Project Chimera.
