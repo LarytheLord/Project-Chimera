@@ -8,6 +8,15 @@ Project Chimera is an AGI system designed with a modular architecture, separatin
 
 ## Recent Enhancements
 
+### Advanced Tooling System
+
+We have moved beyond simple tool definitions to a more robust, schema-driven system. This is a critical step towards our goal of an agent that can learn to use new tools autonomously.
+
+**Key Changes:**
+- **Tool Schemas:** Every tool now exposes a `get_schema()` method. This method returns a JSON schema that explicitly defines the tool's arguments, their types, and whether they are required. This structured information allows the agent to reliably construct valid tool calls.
+- **`FileSystemTool`:** We have introduced a new `FileSystemTool` that empowers the agent to interact with its local environment. This tool currently supports `list_directory` and `read_file` operations, laying the groundwork for the agent to eventually read, write, and even modify its own source code.
+- **Agent Prompting:** The agent's core prompt has been updated to include the new tool schemas. It is now explicitly instructed to use these schemas to format its tool calls as JSON objects.
+
 ### Prometheus Engine: The Gift of Fire
 
 We have replaced the `MockCognitiveCore` with the **Prometheus Engine**, a new cognitive core that connects our agent to a real, powerful language model. This is a major step towards true intelligence, allowing the agent to move beyond scripted responses to generative, nuanced thought.
@@ -52,18 +61,16 @@ To get started with Project Chimera, follow these steps:
     poetry shell
     ```
 
-## Running Tests
+## Running Tests and Verifying Changes
 
-We have updated the test harness to accommodate the new memory persistence functionality.
+To test the agent's capabilities, especially the new `FileSystemTool`, you can use the `MockCognitiveCore`.
 
-**To run the tests:**
-
-1.  **Ensure you are in the `agi-project` directory and the poetry shell is activated.**
-2.  **Execute the test command:**
+1.  **Modify `src/main.py`:** Temporarily replace the `PrometheusCognitiveCore` with the `MockCognitiveCore`. The `MockCognitiveCore` is hardcoded to return a specific tool call, allowing you to test tool functionality without needing a live API key.
+2.  **Run the agent:**
     ```bash
-    python -m pytest tests/test_agent_logic.py
+    python src/main.py
     ```
-    *Note: If you encounter import errors, ensure your `PYTHONPATH` includes the `src` directory within `agi-project` or run `pip install -e .` from the `agi-project` directory to install it in editable mode.*
+    The agent will execute the hardcoded tool call and you can observe the output.
 
 ## Contributing
 

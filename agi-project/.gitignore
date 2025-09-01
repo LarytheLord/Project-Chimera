@@ -19,3 +19,6 @@ build/
 # IDE
 .idea/
 .vscode/
+
+# Agent Memory
+memory_db/

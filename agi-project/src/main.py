@@ -1,48 +1,61 @@
 import os
 import sys
+import json
+from typing import Dict, Any
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
-from cognitive_core.prometheus_core import PrometheusCognitiveCore
-from agent.tool_user import ToolRegistry, WebSearchTool
+from cognitive_core.interfaces import CognitiveCore
+from agent.tool_user import ToolRegistry, WebSearchTool, FileSystemTool
 from agent.agent import Agent
-from rlhf.oracle import RLHFOracle
+
+
+class MockCognitiveCore(CognitiveCore):
+    """A mock implementation of the Cognitive Core for testing the agent loop."""
+    def load_model(self, model_path: str):
+        print(f"Mock model loaded from {model_path}")
+
+    def generate_response(self, inputs: Dict[str, Any], temperature: float = 0.0) -> str:
+        # This is where the magic happens in a real model.
+        # For now, we'll return a pre-defined action to test the loop.
+        print("\n--- Cognitive Core received prompt: ---")
+        print(inputs.get("text_data"))
+        print("--- End of prompt ---")
+        action = {
+            "tool_name": "file_system",
+            "arguments": {
+                "operation": "list_directory",
+                "path": "src"
+            }
+        }
+        return json.dumps(action)
+
+    def train(self, dataset: Any):
+        print("Mock model is being trained.")
+
+    def get_state(self) -> Any:
+        return {"mock_weights": [1, 2, 3]}
 
 # --- Main Application ---
 
 def main():
     """Initializes and runs the AGI agent."""
-    print("Initializing Project Chimera with the Prometheus Engine and RLHF Oracle...")
+    print("Initializing Project Chimera with Mock Cognitive Core...")
 
     # 1. Set up the Cognitive Core
-    try:
-        cognitive_core = PrometheusCognitiveCore(
-            api_url="https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
-        )
-        cognitive_core.load_model("gemini-pro")
-    except ValueError as e:
-        print(f"\n--- CONFIGURATION ERROR ---")
-        print(f"Error initializing the cognitive core: {e}")
-        print("Please make sure the GEMINI_API_KEY environment variable is set correctly.")
-        print("---")
-        return
+    cognitive_core = MockCognitiveCore()
+    cognitive_core.load_model("mock-model")
 
     # 2. Set up the Tool Registry
     tool_registry = ToolRegistry()
     tool_registry.register_tool(WebSearchTool())
+    tool_registry.register_tool(FileSystemTool())
 
     # 3. Set up the RLHF Oracle
-    try:
-        reward_model_path = os.path.join(project_root, "trained_models", "reward_model")
-        rlhf_oracle = RLHFOracle(model_path=reward_model_path)
-    except FileNotFoundError as e:
-        print(f"\n--- CONFIGURATION ERROR ---")
-        print(f"Error initializing the RLHF Oracle: {e}")
-        print("Please make sure you have trained a reward model by running scripts/train_reward_model.py first.")
-        print("---")
-        return
+    # We don't need the oracle for this test, so we'll pass None.
+    rlhf_oracle = None
 
     # 4. Create the Agent
     db_path = os.path.join(project_root, "memory_db")
@@ -56,7 +69,7 @@ def main():
     # 5. Start the agent's main loop with an initial goal
     initial_observation = {
         "source_tool": "system_start",
-        "data": {"text_data": "The AGI system has been activated. Your goal is to research the latest advancements in AGI."},
+        "data": {"text_data": "The AGI system has been activated. Your goal is to list the files in the 'src' directory."},
         "is_error": False
     }
 

@@ -39,12 +39,13 @@ class Agent:
         {observation}
         
         **Available Tools:**
-        {self.tool_registry.get_tool_descriptions()}
+        {self.tool_registry.get_tool_schemas()}
         
         Based on the observation, your history, and your recalled experiences, what is your next action?
-        Your response must be a JSON object of the following format:
+        Your response must be a JSON object that strictly adheres to the schema of one of the available tools.
+        For example:
         {{
-            "tool_name": "tool_to_call",
+            "tool_name": "tool_name",
             "arguments": {{
                 "arg1": "value1",
                 "arg2": "value2"
