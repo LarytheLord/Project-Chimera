@@ -1,7 +1,7 @@
 # Project Chimera: An Artificial General Intelligence
 
 This repository contains the source code and documentation for Project Chimera, a phased initiative to develop a self-sufficient Artificial General Intelligence (AGI).
-
+By Abi and his team
 ## Plan
 
 The project follows a multi-phase development plan:
