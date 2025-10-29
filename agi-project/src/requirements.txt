@@ -3,3 +3,4 @@ lancedb
 sentence-transformers
 pandas
 pyarrow
+trl

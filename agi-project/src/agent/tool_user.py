@@ -4,7 +4,9 @@ import abc
 import os
 import json
 from typing import Dict, Any, List
-from googlesearch import search
+from ddgs import DDGS
+import requests
+from bs4 import BeautifulSoup
 
 class Tool(abc.ABC):
     """Abstract Base Class for a tool that the agent can use."""
@@ -60,10 +62,14 @@ class ToolRegistry:
         schemas = {name: tool.get_schema() for name, tool in self._tools.items()}
         return json.dumps(schemas, indent=2)
 
+    def get_tool_names(self) -> List[str]:
+        """Returns a list of all registered tool names."""
+        return list(self._tools.keys())
+
 # --- Tool Implementations ---
 
 class WebSearchTool(Tool):
-    """A tool for searching the web."""
+    """A tool for searching the web and scraping content."""
 
     @property
     def name(self) -> str:
@@ -71,7 +77,7 @@ class WebSearchTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Searches the web for a given query and returns the top results."
+        return "Searches the web for a given query, scrapes the content of the top results, and returns the text."
 
     def get_schema(self) -> Dict[str, Any]:
         return {
@@ -90,13 +96,27 @@ class WebSearchTool(Tool):
         }
 
     def __call__(self, query: str) -> str:
-        print(f"--- EXECUTING WEB SEARCH: {query} ---")
+        print(f"--- EXECUTING WEB SEARCH AND SCRAPE: {query} ---")
         try:
-            search_results = search(query, num=5, stop=5, pause=2)
-            results = [str(r) for r in search_results]
-            return f"Results for '{query}':\n" + "\n".join(results)
+            with DDGS() as ddgs:
+                search_results = [r['href'] for r in ddgs.text(query, max_results=3)]
+            scraped_content = []
+            for url in search_results:
+                scraped_content.append(self._scrape_page(url))
+            return f"Results for '{query}':\n" + "\n".join(scraped_content)
         except Exception as e:
-            return f"Error during web search: {e}"
+            return f"Error during web search and scrape: {e}"
+
+    def _scrape_page(self, url: str) -> str:
+        try:
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()  # Raise an exception for bad status codes
+            soup = BeautifulSoup(response.content, 'html.parser')
+            # Get text and remove extra whitespace
+            text = ' '.join(soup.get_text().split())
+            return f"Scraped content from {url}:\n{text[:1000]}..." # Return first 1000 chars
+        except Exception as e:
+            return f"Error scraping {url}: {e}"
 
 class FileSystemTool(Tool):
     """A tool for interacting with the local file system."""

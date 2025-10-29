@@ -17,6 +17,9 @@ class Agent:
         self.episodic_memory = VectorEpisodicMemory(db_path=db_path)
         self.rlhf_oracle = rlhf_oracle
         self.num_candidates = num_candidates
+        # Ensure WebSearchTool is registered
+        if "web_search" not in self.tool_registry.get_tool_names():
+            self.tool_registry.register_tool(WebSearchTool())
 
     def _think(self, observation: Any) -> Any:
         """Uses the cognitive core and RLHF oracle to decide on the best next action."""
