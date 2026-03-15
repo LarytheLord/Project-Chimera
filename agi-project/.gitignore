@@ -22,3 +22,5 @@ build/
 
 # Agent Memory
 memory_db/
+*.jsonl
+trained_models/

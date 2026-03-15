@@ -2,13 +2,16 @@
 Consciousness-aware agent that integrates the Narcissus system with Project Chimera's agent functionality
 """
 import json
-from typing import Any, List, Dict
-from cognitive_core.interfaces import CognitiveCore
-from agent.memory import WorkingMemory, VectorEpisodicMemory
-from agent.tool_user import ToolRegistry
-from rlhf.oracle import RLHFOracle
+from typing import TYPE_CHECKING, Any, Dict, List
+
+from ..agent.memory import Experience, VectorEpisodicMemory, WorkingMemory
+from ..agent.tool_user import ToolRegistry
+from ..cognitive_core.interfaces import CognitiveCore
 from .integration import ConsciousnessIntegration
 from .narcissus_core import NarcissusConsciousnessCore
+
+if TYPE_CHECKING:
+    from ..rlhf.oracle import RLHFOracle
 
 
 class ConsciousnessAwareAgent:
@@ -18,7 +21,7 @@ class ConsciousnessAwareAgent:
                  cognitive_core: CognitiveCore, 
                  tool_registry: ToolRegistry, 
                  db_path: str, 
-                 rlhf_oracle: RLHFOracle = None, 
+                 rlhf_oracle: "RLHFOracle" = None, 
                  num_candidates: int = 3):
         
         # Initialize the base components
@@ -187,16 +190,6 @@ class ConsciousnessAwareAgent:
             outcome = self._act(action)
             self.working_memory.add(outcome)
 
-            # Remember the experience
-            experience = {
-                'observation': observation,
-                'action': action, 
-                'outcome': outcome,
-                'timestamp': self.cycle_count
-            }
-            
-            # In the real Experience format:
-            from agent.memory import Experience
             formatted_experience = Experience(
                 observation=observation,
                 action=action,

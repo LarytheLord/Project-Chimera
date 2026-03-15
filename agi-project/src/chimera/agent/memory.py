@@ -1,16 +1,26 @@
 # This file will define the agent's memory systems.
 
 import json
-from typing import List, Any, NamedTuple
 from collections import deque
-import lancedb
-from sentence_transformers import SentenceTransformer
-import pandas as pd
-import pyarrow as pa
 import os
+from typing import Any, List, NamedTuple
 
 # Placeholder for protobuf messages
 # from ..protos import core_pb2
+
+
+def _load_vector_dependencies():
+    try:
+        import lancedb
+        import pyarrow as pa
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise ImportError(
+            "VectorEpisodicMemory requires lancedb, pyarrow, and sentence-transformers. "
+            "Install requirements-submodule.txt to enable vector memory."
+        ) from exc
+
+    return lancedb, pa, SentenceTransformer
 
 class Experience(NamedTuple):
     """Represents a single experience tuple for the agent."""
@@ -48,8 +58,10 @@ class VectorEpisodicMemory:
             table_name: Name of the table to store experiences.
         """
         print("Initializing VectorEpisodicMemory...")
+        lancedb, pa, sentence_transformer = _load_vector_dependencies()
+        self._pa = pa
         # Use a lightweight, high-performance model suitable for local execution
-        self.model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu') # Force CPU usage
+        self.model = sentence_transformer('all-MiniLM-L6-v2', device='cpu') # Force CPU usage
         
         db_uri = os.path.join(db_path, "lancedb")
         os.makedirs(db_uri, exist_ok=True)
@@ -63,11 +75,11 @@ class VectorEpisodicMemory:
             return db.open_table(table_name)
         else:
             embedding_dim = self.model.get_sentence_embedding_dimension()
-            schema = pa.schema([
-                pa.field("vector", pa.list_(pa.float32(), embedding_dim)),
-                pa.field("observation_text", pa.string()),
-                pa.field("action_text", pa.string()),
-                pa.field("outcome_text", pa.string())
+            schema = self._pa.schema([
+                self._pa.field("vector", self._pa.list_(self._pa.float32(), embedding_dim)),
+                self._pa.field("observation_text", self._pa.string()),
+                self._pa.field("action_text", self._pa.string()),
+                self._pa.field("outcome_text", self._pa.string())
             ])
             return db.create_table(table_name, schema=schema)
 
@@ -78,10 +90,16 @@ class VectorEpisodicMemory:
         out = json.dumps(experience.outcome)
         return f"Observation: {obs}\nAction: {act}\nOutcome: {out}"
 
+    def _to_vector_list(self, embedding: Any) -> List[float]:
+        """Normalizes encoder outputs to a plain Python list."""
+        if hasattr(embedding, "tolist"):
+            return embedding.tolist()
+        return list(embedding)
+
     def remember(self, experience: Experience):
         """Stores a new experience in the vector database."""
         text_to_embed = self._experience_to_text(experience)
-        vector = self.model.encode(text_to_embed).tolist()
+        vector = self._to_vector_list(self.model.encode(text_to_embed))
 
         data = {
             "vector": vector,
@@ -97,7 +115,7 @@ class VectorEpisodicMemory:
         if self.table.count_rows() == 0:
             return []
             
-        query_vector = self.model.encode(query).tolist()
+        query_vector = self._to_vector_list(self.model.encode(query))
         results = self.table.search(query_vector).limit(top_k).to_df()
 
         recalled_experiences = []

@@ -3,12 +3,11 @@ Narcissus Core: Consciousness Simulation & Self-Modeling System for Project Chim
 """
 import json
 import time
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime
-import numpy as np
-from cognitive_core.interfaces import CognitiveCore
-from agent.memory import WorkingMemory, VectorEpisodicMemory
+from typing import Any, Dict, List, Optional
+
+from ..agent.memory import VectorEpisodicMemory, WorkingMemory
+from ..cognitive_core.interfaces import CognitiveCore
 
 
 @dataclass
