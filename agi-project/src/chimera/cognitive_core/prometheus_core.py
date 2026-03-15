@@ -1,9 +1,15 @@
 import httpx
-import os
 import json
+import os
 from typing import Any, Dict
 
 from .interfaces import CognitiveCore
+
+DEFAULT_GEMINI_API_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-pro:generateContent"
+)
+
 
 class PrometheusCognitiveCore(CognitiveCore):
     """
@@ -11,11 +17,11 @@ class PrometheusCognitiveCore(CognitiveCore):
     via an API call. This is the "Prometheus Engine" of our AGI.
     """
 
-    def __init__(self, api_url: str, api_key: str = None):
-        self.api_url = api_url
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
+    def __init__(self, api_url: str = None, api_key: str = None):
+        self.api_url = api_url or os.environ.get("CHIMERA_LLM_API_URL") or DEFAULT_GEMINI_API_URL
+        self.api_key = api_key or os.environ.get("CHIMERA_LLM_API_KEY")
         if not self.api_key:
-            raise ValueError("API key not provided or found in GEMINI_API_KEY environment variable.")
+            raise ValueError("CHIMERA_LLM_API_KEY environment variable required.")
         # The API key for Gemini is not a Bearer token, it's passed as a query parameter.
         self.client = httpx.Client(params={"key": self.api_key})
 

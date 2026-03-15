@@ -15,12 +15,11 @@ RUN pip install poetry
 # Copy dependency definitions
 COPY pyproject.toml poetry.lock* ./
 
-# Install dependencies
-# --no-root is important to avoid installing the project itself, just the deps
-RUN poetry install --no-root
+# Install dependencies and the Chimera package itself
+RUN poetry install
 
 # Copy the rest of the application's code
 COPY . .
 
-# Command to run the AGI (placeholder for now)
-CMD ["poetry", "run", "python", "src/main.py"]
+# Library image smoke check
+CMD ["poetry", "run", "python", "-c", "import chimera; print('Project Chimera library image ready')"]

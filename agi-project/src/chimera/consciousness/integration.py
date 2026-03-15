@@ -1,8 +1,8 @@
 """
 Integration module to connect Narcissus consciousness system with Project Chimera's agent
 """
-import json
 from typing import Any, Dict, List
+
 from .narcissus_core import NarcissusConsciousnessCore, CognitiveState
 
 

@@ -1,16 +1,18 @@
 
 import json
-from typing import Any, List
+from typing import TYPE_CHECKING, Any
 
-from cognitive_core.interfaces import CognitiveCore
-from agent.memory import WorkingMemory, VectorEpisodicMemory, Experience
-from agent.tool_user import ToolRegistry, Tool, WebSearchTool
-from rlhf.oracle import RLHFOracle
+from ..cognitive_core.interfaces import CognitiveCore
+from .memory import Experience, VectorEpisodicMemory, WorkingMemory
+from .tool_user import ToolRegistry, WebSearchTool
+
+if TYPE_CHECKING:
+    from ..rlhf.oracle import RLHFOracle
 
 class Agent:
     """The main agent class that orchestrates the AGI's operation."""
 
-    def __init__(self, cognitive_core: CognitiveCore, tool_registry: ToolRegistry, db_path: str, rlhf_oracle: RLHFOracle = None, num_candidates: int = 3):
+    def __init__(self, cognitive_core: CognitiveCore, tool_registry: ToolRegistry, db_path: str, rlhf_oracle: "RLHFOracle" = None, num_candidates: int = 3):
         self.cognitive_core = cognitive_core
         self.tool_registry = tool_registry
         self.working_memory = WorkingMemory()
