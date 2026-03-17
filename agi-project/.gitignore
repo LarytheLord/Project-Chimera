@@ -22,3 +22,7 @@ build/
 
 # Agent Memory
 memory_db/
+km_memory_db/
+*.jsonl
+trained_models/
+.venv/

@@ -1,6 +1,0 @@
-googlesearch-python
-lancedb
-sentence-transformers
-pandas
-pyarrow
-trl

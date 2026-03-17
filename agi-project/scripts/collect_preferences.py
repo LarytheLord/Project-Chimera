@@ -1,15 +1,11 @@
-
-import os
-import sys
 import json
+from pathlib import Path
 
-# Add the project root to the Python path to allow imports from 'src'
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+from chimera.agent.agent import Agent
+from chimera.agent.tool_user import ToolRegistry, WebSearchTool
+from chimera.cognitive_core.prometheus_core import PrometheusCognitiveCore
 
-from src.cognitive_core.prometheus_core import PrometheusCognitiveCore
-from src.agent.tool_user import ToolRegistry, WebSearchTool
-from src.agent.agent import Agent
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     """Main function to run the interactive preference collection script."""
@@ -21,27 +17,25 @@ def main():
     # 1. Initialize the Agent
     try:
         # This setup is taken from main.py
-        cognitive_core = PrometheusCognitiveCore(
-            api_url="https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
-        )
-        cognitive_core.load_model("gemini-pro")
+        cognitive_core = PrometheusCognitiveCore()
+        cognitive_core.load_model("remote-gemini-model")
         
         tool_registry = ToolRegistry()
         tool_registry.register_tool(WebSearchTool())
         
         # The agent itself isn't strictly needed, we just need its cognitive core
         # but initializing it is a good way to ensure all components are available.
-        db_path = os.path.join(project_root, "memory_db")
+        db_path = str(PROJECT_ROOT / "memory_db")
         agent = Agent(cognitive_core=cognitive_core, tool_registry=tool_registry, db_path=db_path)
 
     except ValueError as e:
         print(f"\n--- CONFIGURATION ERROR ---")
         print(f"Error initializing the agent: {e}")
-        print("Please make sure the GEMINI_API_KEY environment variable is set correctly.")
+        print("Please make sure the CHIMERA_LLM_API_KEY environment variable is set correctly.")
         print("---")
         return
 
-    output_file = os.path.join(project_root, "preference_data.jsonl")
+    output_file = PROJECT_ROOT / "preference_data.jsonl"
     print(f"Preferences will be saved to: {output_file}\n")
 
     # 2. Main collection loop
@@ -82,7 +76,7 @@ def main():
                 "rejected": rejected
             }
 
-            with open(output_file, 'a') as f:
+            with output_file.open('a', encoding='utf-8') as f:
                 f.write(json.dumps(preference_data) + '\n')
             
             print("Preference saved!\n")

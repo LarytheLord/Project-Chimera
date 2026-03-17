@@ -1,17 +1,15 @@
-
-import os
-import sys
 import json
+import sys
+from pathlib import Path
 
 def verify_data():
     """Reads the preference data file and verifies that each line is valid JSON."""
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    preference_file = os.path.join(project_root, "preference_data.jsonl")
+    preference_file = Path(__file__).resolve().parents[1] / "preference_data.jsonl"
     
     print(f"Verifying data file: {preference_file}")
     
     try:
-        with open(preference_file, 'r') as f:
+        with preference_file.open('r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 try:
                     json.loads(line)

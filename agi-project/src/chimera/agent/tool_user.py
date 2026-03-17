@@ -1,12 +1,9 @@
 # This file will define the interface for using tools.
 
 import abc
-import os
 import json
-from typing import Dict, Any, List
-from ddgs import DDGS
-import requests
-from bs4 import BeautifulSoup
+import os
+from typing import Any, Dict, List
 
 class Tool(abc.ABC):
     """Abstract Base Class for a tool that the agent can use."""
@@ -98,6 +95,8 @@ class WebSearchTool(Tool):
     def __call__(self, query: str) -> str:
         print(f"--- EXECUTING WEB SEARCH AND SCRAPE: {query} ---")
         try:
+            from ddgs import DDGS
+
             with DDGS() as ddgs:
                 search_results = [r['href'] for r in ddgs.text(query, max_results=3)]
             scraped_content = []
@@ -109,6 +108,9 @@ class WebSearchTool(Tool):
 
     def _scrape_page(self, url: str) -> str:
         try:
+            import requests
+            from bs4 import BeautifulSoup
+
             response = requests.get(url, timeout=5)
             response.raise_for_status()  # Raise an exception for bad status codes
             soup = BeautifulSoup(response.content, 'html.parser')
