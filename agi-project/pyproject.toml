@@ -13,6 +13,7 @@ numpy = "<2.0"
 httpx = "*" # For making HTTP requests
 requests = "*"
 googlesearch-python = "*"
+beautifulsoup4 = "*"
 lancedb = "*"
 sentence-transformers = "*"
 pandas = "*"
