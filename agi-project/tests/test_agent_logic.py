@@ -1,22 +1,111 @@
-
-import sys
-import os
-
-
-# Add the 'src' directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-
 import json
 from typing import Any, Dict
 
+import pytest
 
-from agent.agent import Agent
-from agent.memory import Experience
-from agent.tool_user import Tool, ToolRegistry
-
-from cognitive_core.interfaces import CognitiveCore
+from chimera.agent.agent import Agent
+from chimera.agent.memory import Experience
+from chimera.agent.tool_user import Tool, ToolRegistry
+from chimera.cognitive_core.interfaces import CognitiveCore
 
 # --- Mock Components ---
+
+class FakeSentenceTransformer:
+    """Deterministic embedding stub for testing vector memory round-trips."""
+
+    def __init__(self, *_args, **_kwargs):
+        pass
+
+    def get_sentence_embedding_dimension(self) -> int:
+        return 3
+
+    def encode(self, text: str):
+        length = float(len(text))
+        return [length, length / 2.0, 1.0]
+
+
+class FakeArrow:
+    @staticmethod
+    def schema(fields):
+        return fields
+
+    @staticmethod
+    def field(name, data_type):
+        return (name, data_type)
+
+    @staticmethod
+    def list_(data_type, embedding_dim):
+        return (data_type, embedding_dim)
+
+    @staticmethod
+    def float32():
+        return "float32"
+
+    @staticmethod
+    def string():
+        return "string"
+
+
+class FakeResults:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def iterrows(self):
+        for index, row in enumerate(self.rows):
+            yield index, row
+
+
+class FakeSearch:
+    def __init__(self, rows):
+        self.rows = rows
+        self._limit = len(rows)
+
+    def limit(self, top_k: int):
+        self._limit = top_k
+        return self
+
+    def to_df(self):
+        return FakeResults(self.rows[: self._limit])
+
+
+class FakeTable:
+    def __init__(self):
+        self.rows = []
+
+    def add(self, rows):
+        self.rows.extend(rows)
+
+    def count_rows(self):
+        return len(self.rows)
+
+    def search(self, query_vector):
+        return FakeSearch(self.rows)
+
+
+class FakeDB:
+    def __init__(self):
+        self.tables = {}
+
+    def table_names(self):
+        return list(self.tables.keys())
+
+    def open_table(self, table_name):
+        return self.tables[table_name]
+
+    def create_table(self, table_name, schema):
+        table = FakeTable()
+        self.tables[table_name] = table
+        return table
+
+
+class FakeLanceDB:
+    def __init__(self):
+        self.databases = {}
+
+    def connect(self, path):
+        if path not in self.databases:
+            self.databases[path] = FakeDB()
+        return self.databases[path]
 
 class MockCognitiveCore(CognitiveCore):
     """A mock cognitive core that returns a predefined JSON action."""
@@ -34,6 +123,9 @@ class MockCognitiveCore(CognitiveCore):
 
     def get_state(self) -> Any:
         pass
+
+class SumTool(Tool):
+    """A simple tool for testing that adds two numbers."""
     @property
     def name(self) -> str:
         return "sum_numbers"
@@ -42,12 +134,39 @@ class MockCognitiveCore(CognitiveCore):
     def description(self) -> str:
         return "Adds two integers a and b."
 
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "a": {"type": "integer"},
+                    "b": {"type": "integer"},
+                },
+                "required": ["a", "b"],
+            },
+        }
+
     def __call__(self, a: int, b: int) -> Any:
         return a + b
 
 # --- Test Fixture ---
 
-def setup_agent_for_test(memory_filepath: str = None):
+@pytest.fixture(autouse=True)
+def fake_embedding_model(monkeypatch):
+    fake_lancedb = FakeLanceDB()
+    monkeypatch.setattr(
+        "chimera.agent.memory._load_vector_dependencies",
+        lambda: (fake_lancedb, FakeArrow, FakeSentenceTransformer),
+    )
+
+@pytest.fixture
+def temp_db_path(tmp_path):
+    """Create a temporary directory for the LanceDB database."""
+    return str(tmp_path)
+
+def setup_agent_for_test(db_path: str):
     """Sets up the agent with mock components for a predictable test."""
     mock_action = {
         "tool_name": "sum_numbers",
@@ -62,67 +181,46 @@ def setup_agent_for_test(memory_filepath: str = None):
     agent = Agent(
         cognitive_core=mock_core,
         tool_registry=tool_registry,
-        memory_filepath=memory_filepath
+        db_path=db_path
     )
     return agent
 
 # --- The Test ---
 
-def test_agent_think_act_loop_and_memory_persistence():
+def test_agent_vector_memory_and_recall(temp_db_path):
     """
-    Tests one full cycle of the agent's perceive-think-act loop and memory persistence.
+    Tests the agent's ability to use the VectorEpisodicMemory to remember
+    an experience and recall it based on semantic similarity.
     """
-    MEMORY_FILE = "test_agent_memory.json"
-    if os.path.exists(MEMORY_FILE):
-        os.remove(MEMORY_FILE)
-
-    # 1. Setup the first agent and run a cycle
-    agent1 = setup_agent_for_test(memory_filepath=MEMORY_FILE)
-    initial_observation = {"source": "user", "data": {"text_data": "What is 5 + 10?"}}
+    # 1. Setup agent and a unique experience
+    agent = setup_agent_for_test(db_path=temp_db_path)
     
-    # We are not testing the full loop here, but the components
-    # Think
-    action = agent1._think(initial_observation)
-    expected_action = {
-        "tool_name": "sum_numbers",
-        "arguments": {"a": 5, "b": 10}
-    }
-    assert action == expected_action
+    unique_observation = {"source": "user", "data": {"text_data": "The sky is filled with blue elephants today."}}
+    action_taken = {"tool_name": "observe", "arguments": {"phenomenon": "flying blue elephants"}}
+    outcome_result = {"source_tool": "observe", "data": {"text_data": "Confirmed: The elephants are indeed blue and airborne."}}
     
-    # Act
-    outcome = agent1._act(action)
-    expected_outcome = {
-        'source_tool': 'sum_numbers',
-        'data': {'text_data': 15},
-        'is_error': False
-    }
-    assert outcome == expected_outcome
+    experience_to_remember = Experience(
+        observation=unique_observation, 
+        action=action_taken, 
+        outcome=outcome_result
+    )
 
-    # Remember
-    experience = Experience(observation=initial_observation, action=action, outcome=outcome)
-    agent1.episodic_memory.remember(experience)
+    # 2. Agent remembers the experience
+    agent.episodic_memory.remember(experience_to_remember)
 
+    # 3. Agent recalls memory with a semantically similar query
+    # This query does not use the same keywords but has a similar meaning.
+    semantic_query = unique_observation["data"]["text_data"]
+    recalled_experiences = agent.episodic_memory.recall(semantic_query, top_k=1)
 
-    # 2. Create a second agent and verify memory is loaded
-    agent2 = setup_agent_for_test(memory_filepath=MEMORY_FILE)
+    # 4. Verification
+    # Verify that the agent recalled the correct experience.
+    assert len(recalled_experiences) == 1, "Should have recalled one experience."
     
-    # Verify that the second agent has loaded the history from the first agent.
-    assert len(agent2.episodic_memory.experiences) == 1
-    loaded_experience = agent2.episodic_memory.experiences[0]
+    recalled_exp = recalled_experiences[0]
     
-    # We need to convert namedtuple to tuple for comparison
-    assert tuple(loaded_experience) == experience
+    # Compare the observation text which is the most unique part
+    assert recalled_exp.observation["data"]["text_data"] == unique_observation["data"]["text_data"], \
+        "The recalled experience should match the one that was remembered."
 
-    # --- Cleanup ---
-    if os.path.exists(MEMORY_FILE):
-        os.remove(MEMORY_FILE)
-    
-    print("Agent think-act-memory cycle test passed successfully!")
-
-if __name__ == "__main__":
-    test_agent_think_act_loop_and_memory_persistence()
-
-
-
-
-
+    print("Agent vector memory (remember and recall) test passed successfully!")

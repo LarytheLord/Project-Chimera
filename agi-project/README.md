@@ -1,7 +1,18 @@
 # Project Chimera: An Artificial General Intelligence
 
 This repository contains the source code and documentation for Project Chimera, a phased initiative to develop a self-sufficient Artificial General Intelligence (AGI).
+By Abi and his team
 
+## Package Usage
+
+Chimera is structured as a reusable Python package under `src/chimera`.
+
+```python
+from chimera.agent.memory import VectorEpisodicMemory
+from chimera.cognitive_core.prometheus_core import PrometheusCognitiveCore
+```
+
+Set `CHIMERA_LLM_API_KEY` before using the remote Prometheus cognitive core.
 ## Plan
 
 The project follows a multi-phase development plan:

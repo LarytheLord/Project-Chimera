@@ -1,16 +1,32 @@
 [tool.poetry]
 name = "agi-chimera"
-version = "0.1.0"
+version = "0.2.0"
 description = "Project Chimera: A self-sufficient Artificial General Intelligence"
 authors = ["Gemini"]
+packages = [{ include = "chimera", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 jax = "*"
 flax = "*"
 optax = "*"
-numpy = "*"
-pyarrow = "*" # For Apache Arrow integration
+numpy = "<2.0"
+httpx = "*" # For making HTTP requests
+requests = "*"
+<<<<<<< HEAD
+googlesearch-python = "*"
+=======
+ddgs = "*"
+>>>>>>> d9e3271858b857ee321d463e261256ed47f881de
+beautifulsoup4 = "*"
+lancedb = "*"
+sentence-transformers = "*"
+# Pinning ML stack to known compatible versions to avoid dependency issues
+torch = "~2.3.1"
+pyarrow = "~16.1.0"
+datasets = "~2.19.1"
+transformers = "~4.41.2"
+trl = "~0.9.4"
 # Rust FFI libraries will be added here as they are developed
 
 [tool.poetry.group.dev.dependencies]
