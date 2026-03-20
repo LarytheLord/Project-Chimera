@@ -1,44 +1,55 @@
-# Project Chimera: AGI Development Roadmap
+# Project Chimera — Roadmap
 
-This document outlines the high-level plan for the future development of Project Chimera, designed to advance us toward the goal of true AGI.
+## Phase 1: Foundational Intelligence — COMPLETED
 
-**Phase 1: Foundational Intelligence & Scalability**
+| Component | Status | Description |
+|-----------|--------|-------------|
+| Prometheus Core | Done | Gemini 1.5 Flash API integration via `PrometheusCognitiveCore` |
+| Episodic Memory | Done | `VectorEpisodicMemory` — LanceDB + SentenceTransformers (`all-MiniLM-L6-v2`) |
+| Working Memory | Done | Bounded deque (20 items), fast in-memory context |
+| Agent Loop | Done | `Agent` class — perceive→think→act with tool use and memory |
+| Tool Registry | Done | `Tool` ABC + `ToolRegistry` + WebSearch + FileSystem tools |
+| RLHF | Done | `RewardModel` (distilbert) + `RLHFOracle` for preference-guided selection |
+| Narcissus | Done | Self-modeling, metacognitive observer, cognitive state tracking |
+| Consciousness-Aware Agent | Done | `ConsciousnessAwareAgent` — Agent + Narcissus integrated |
+| Knight Medicare Integration | Done | Therapy backend via `chimera-bridge/` (FastAPI) |
 
-*   **Objective:** Transition from mock components to a real, trainable cognitive core and establish a more sophisticated memory and learning system.
-*   **Key Initiatives:**
-    1.  **Implement a Real Cognitive Core: [COMPLETED]**
-        *   We have successfully replaced the `MockCognitiveCore` with the `PrometheusCognitiveCore`, which integrates with real language models via API.
-        *   Develop a data pipeline for continuous pre-training and fine-tuning of the model.
-    2.  **Vector-Based Memory:**
-        *   Upgrade `EpisodicMemory` from keyword search to a vector-based similarity search. This will involve integrating a vector database (e.g., ChromaDB, Pinecone) and generating embeddings for all experiences. This will allow the agent to recall memories based on conceptual similarity, not just keywords.
-    3.  **Reinforcement Learning from Human Feedback (RLHF): [COMPLETED]**
-        *   We have implemented a mechanism for the agent to learn from feedback, including an innovative "Experiential Self-Critique" loop that leverages its own memory to generate preference data.
+## Phase 2: Enhanced Cognition — IN PROGRESS
 
-**Phase 2: Self-Sufficiency & Environmental Interaction**
+| # | Feature | Status | Priority |
+|---|---------|--------|----------|
+| #9 | Fix `chimera/__init__.py` for submodule compat | Blocker | P0 |
+| #15 | Standalone CLI + dual-mode package restructure | Open | P1 |
+| #16 | Local emotion detection (HF distilroberta, 7 labels, CPU) | Open | P1 |
+| #21 | Feed Narcissus consciousness insights back into prompts | Open | P1 |
+| #17 | Reflexion self-critique + Constitutional AI guardrails | Open | P2 |
+| #18 | Local LLM fallback (SmolLM2-360M GGUF, CPU) | Open | P2 |
+| #20 | ACT-R memory decay + temporal memory validity | Open | P2 |
 
-*   **Objective:** Enable the agent to operate more autonomously and interact with a wider range of environments and tools.
-*   **Key Initiatives:**
-    1.  **Advanced Tool Development & Use:**
-        *   Expand the agent's toolset to include file system operations, web browsing, and interaction with APIs.
-        *   Develop a system for the agent to learn how to use new tools by reading their documentation.
-    2.  **Long-Term Planning & Goal Setting:**
-        *   Implement a hierarchical planning module that allows the agent to break down high-level goals into smaller, manageable sub-tasks.
-        *   Allow the agent to set its own goals based on a high-level directive (e.g., "improve the codebase").
-    3.  **Containerization & Deployment:**
-        *   Fully utilize the Docker environment to create a standardized, reproducible environment for the agent to run in. This will allow us to deploy the agent to various systems and cloud platforms.
+**Priority order:** #9 → #15 → #16 → #21 → #17 → #20 → #18
 
-**Phase 3: Metacognition & Self-Improvement (The "Ouroboros" Phase)**
+## Phase 3: Advanced Research — PLANNED
 
-*   **Objective:** The ultimate goal: enable the agent to understand and improve its own source code.
-*   **Key Initiatives:**
-    1.  **Code Comprehension & Generation:**
-        *   Fine-tune the cognitive core specifically for code-related tasks. The agent should be able to read its own source code, understand its functionality, and identify areas for improvement.
-        *   Give the agent the ability to write, modify, and test its own code.
-    2.  **Self-Modification Loop:**
-        *   Implement a "metacognition loop" where the agent can:
-            1.  Analyze its own performance and identify areas for improvement.
-            2.  Formulate a plan to modify its own code to address these limitations.
-            3.  Write and test the new code in a sandboxed environment.
-            4.  If the tests pass, integrate the new code into its own codebase.
-    3.  **Ethical and Safety Governor:**
-        *   Implement a non-modifiable "governor" module that oversees the agent's self-improvement process. This module will enforce a set of core ethical principles and safety constraints to ensure that the agent's self-modifications are always aligned with our project's goals and safety guidelines.
+| Feature | Description |
+|---------|-------------|
+| Three-tier memory | Semantic (patient facts) + episodic (sessions) + procedural (strategies) |
+| "Dreaming" | Async background synthesis of patient/user representations |
+| Global Workspace | Components compete for attention; crisis signals always win |
+| Cognitive state machine | SOAR/ACT-R-inspired: PERCEIVE→ATTEND→RETRIEVE→DELIBERATE→REFLECT→ACT→LEARN |
+| DSPy prompt optimization | Auto-tune Gemini prompts via bootstrapping |
+| RLHF with therapist feedback | Psychologist rates AI therapy responses → preference pairs → better model |
+| Introspective compression | Compress cognitive states into stable personality traits |
+| Multi-agent inner council | Assessment / Intervention / Empathy / Safety sub-agents |
+
+## Constraints
+
+- **$0 budget** — free-tier APIs, local models, open-source only
+- **CPU only** — no GPU requirements
+- **Dual-mode** — every feature must work standalone AND as a KM submodule
+- **Therapy-safe** — never break patient-facing therapy quality for research features
+
+## References
+
+- [Evolution Plan](https://github.com/LarytheLord/knight-medicare/blob/feat/chimera-integration/docs/CHIMERA-EVOLUTION-PLAN.md) — full architecture plan
+- [Discussion #19](https://github.com/LarytheLord/Project-Chimera/discussions/19) — enhancement roadmap
+- [KM Discussion #33](https://github.com/LarytheLord/knight-medicare/discussions/33) — therapy integration status
