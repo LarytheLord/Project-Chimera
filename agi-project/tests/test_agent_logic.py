@@ -5,7 +5,8 @@ import pytest
 
 from chimera.agent.agent import Agent
 from chimera.agent.memory import Experience
-from chimera.agent.tool_user import Tool, ToolRegistry
+from chimera.agent.tool_user import Tool, ToolPolicy, ToolRegistry
+from chimera.consciousness.conscious_agent import ConsciousnessAwareAgent
 from chimera.cognitive_core.interfaces import CognitiveCore
 
 # --- Mock Components ---
@@ -111,8 +112,10 @@ class MockCognitiveCore(CognitiveCore):
     """A mock cognitive core that returns a predefined JSON action."""
     def __init__(self, action_json: Dict[str, Any]):
         self.action_json = action_json
+        self.prompts: list[Dict[str, Any]] = []
 
-    def generate_response(self, prompt: Dict[str, str]) -> str:
+    def generate_response(self, prompt: Dict[str, Any], temperature: float = 0.7) -> str:
+        self.prompts.append(prompt)
         return json.dumps(self.action_json)
 
     def load_model(self, model_path: str):
@@ -151,6 +154,41 @@ class SumTool(Tool):
     def __call__(self, a: int, b: int) -> Any:
         return a + b
 
+
+class RestrictedEchoTool(Tool):
+    @property
+    def name(self) -> str:
+        return "restricted_echo"
+
+    @property
+    def description(self) -> str:
+        return "Echoes a payload, but only when explicitly enabled."
+
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "payload": {"type": "string"},
+                },
+                "required": ["payload"],
+            },
+        }
+
+    def get_policy(self) -> ToolPolicy:
+        return ToolPolicy(
+            risk_level="high",
+            capabilities=("debug.echo",),
+            allowed_by_default=False,
+            requires_approval=True,
+            policy_note="Test-only restricted tool.",
+        )
+
+    def __call__(self, payload: str) -> Any:
+        return payload
+
 # --- Test Fixture ---
 
 @pytest.fixture(autouse=True)
@@ -182,6 +220,16 @@ def setup_agent_for_test(db_path: str):
         cognitive_core=mock_core,
         tool_registry=tool_registry,
         db_path=db_path
+    )
+    return agent
+
+
+def setup_conscious_agent_for_test(db_path: str, action_json: Dict[str, Any], tool_registry: ToolRegistry):
+    mock_core = MockCognitiveCore(action_json=action_json)
+    agent = ConsciousnessAwareAgent(
+        cognitive_core=mock_core,
+        tool_registry=tool_registry,
+        db_path=db_path,
     )
     return agent
 
@@ -224,3 +272,89 @@ def test_agent_vector_memory_and_recall(temp_db_path):
         "The recalled experience should match the one that was remembered."
 
     print("Agent vector memory (remember and recall) test passed successfully!")
+
+
+def test_tool_registry_hides_restricted_tools_from_prompt_by_default():
+    registry = ToolRegistry()
+    registry.register_tool(SumTool())
+    registry.register_tool(RestrictedEchoTool())
+
+    prompt_schemas = json.loads(registry.get_tool_schemas())
+    assert "sum_numbers" in prompt_schemas
+    assert "restricted_echo" not in prompt_schemas
+
+    all_schemas = json.loads(registry.get_tool_schemas(include_restricted=True))
+    assert all_schemas["restricted_echo"]["x-tool-policy"]["allowed_by_default"] is False
+    assert all_schemas["restricted_echo"]["x-tool-policy"]["risk_level"] == "high"
+
+
+def test_tool_registry_blocks_restricted_tools_by_default():
+    registry = ToolRegistry()
+    registry.register_tool(RestrictedEchoTool())
+
+    outcome = registry.execute_action({
+        "tool_name": "restricted_echo",
+        "arguments": {"payload": "secret"},
+    })
+
+    assert outcome["is_error"] is True
+    assert outcome["policy"]["status"] == "blocked"
+    assert "restricted by policy" in outcome["data"]["text_data"]
+
+
+def test_tool_registry_executes_restricted_tools_when_enabled():
+    registry = ToolRegistry(allow_restricted_tools=True)
+    registry.register_tool(RestrictedEchoTool())
+
+    outcome = registry.execute_action({
+        "tool_name": "restricted_echo",
+        "arguments": {"payload": "secret"},
+    })
+
+    assert outcome["is_error"] is False
+    assert outcome["policy"]["status"] == "executed"
+    assert outcome["data"]["text_data"] == "secret"
+
+
+def test_tool_registry_returns_structured_unknown_tool_error():
+    registry = ToolRegistry()
+    outcome = registry.execute_action({
+        "tool_name": "missing_tool",
+        "arguments": {},
+    })
+
+    assert outcome["is_error"] is True
+    assert outcome["policy"]["status"] == "unknown_tool"
+    assert "not found" in outcome["data"]["text_data"]
+
+
+def test_agent_act_uses_policy_aware_tool_execution(temp_db_path):
+    registry = ToolRegistry()
+    registry.register_tool(RestrictedEchoTool())
+    agent = Agent(
+        cognitive_core=MockCognitiveCore(
+            {"tool_name": "restricted_echo", "arguments": {"payload": "secret"}}
+        ),
+        tool_registry=registry,
+        db_path=temp_db_path,
+    )
+
+    outcome = agent._act({"tool_name": "restricted_echo", "arguments": {"payload": "secret"}})
+
+    assert outcome["is_error"] is True
+    assert outcome["policy"]["status"] == "blocked"
+
+
+def test_conscious_agent_act_uses_policy_aware_tool_execution(temp_db_path):
+    registry = ToolRegistry()
+    registry.register_tool(RestrictedEchoTool())
+    agent = setup_conscious_agent_for_test(
+        db_path=temp_db_path,
+        action_json={"tool_name": "restricted_echo", "arguments": {"payload": "secret"}},
+        tool_registry=registry,
+    )
+
+    outcome = agent._act({"tool_name": "restricted_echo", "arguments": {"payload": "secret"}})
+
+    assert outcome["is_error"] is True
+    assert outcome["policy"]["status"] == "blocked"

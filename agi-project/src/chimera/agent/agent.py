@@ -45,6 +45,8 @@ class Agent:
         
         **Available Tools:**
         {self.tool_registry.get_tool_schemas()}
+
+        Only tools listed above are executable in the current policy mode.
         
         Based on the observation, your history, and your recalled experiences, what is your next action?
         Your response must be a JSON object that strictly adheres to the schema of one of the available tools.
@@ -89,15 +91,7 @@ class Agent:
 
     def _act(self, action: Any) -> Any:
         """Executes the chosen action using the tool registry."""
-        try:
-            tool_name = action["tool_name"]
-            arguments = action["arguments"]
-            tool = self.tool_registry.get_tool(tool_name)
-            result = tool(**arguments)
-            outcome = {"source_tool": tool.name, "data": {"text_data": result}, "is_error": False}
-        except Exception as e:
-            outcome = {"source_tool": action.get("tool_name", "unknown_tool"), "data": {"text_data": str(e)}, "is_error": True}
-        return outcome
+        return self.tool_registry.execute_action(action)
 
     def run_main_loop(self, initial_observation: Any):
         """Runs the main perceive-think-act loop of the agent."""
