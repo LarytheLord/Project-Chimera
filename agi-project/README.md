@@ -9,6 +9,7 @@ This directory contains the core Python package (`src/chimera/`) and all support
 ```
 agi-project/
 ├── src/chimera/                 # The core package (importable as `chimera.*`)
+│   ├── main.py                  #   Standalone CLI entry point (`python -m chimera.main`)
 │   ├── cognitive_core/          # Prometheus — LLM abstraction
 │   │   ├── interfaces.py        #   CognitiveCore ABC (implement this for new LLM backends)
 │   │   ├── prometheus_core.py   #   Gemini 1.5 Flash implementation
@@ -36,6 +37,7 @@ agi-project/
 │
 ├── tests/                       # Test suite
 │   ├── test_agent_logic.py      #   Agent + memory + tool tests
+│   ├── test_main.py             #   Standalone CLI tests
 │   ├── test_consciousness.py    #   Full Narcissus integration tests
 │   └── test_consciousness_simple.py  # Unit tests for consciousness components
 │
@@ -69,6 +71,21 @@ poetry run pytest tests/ -v
 PYTHONPATH=src pytest tests/ -v
 ```
 
+## Running Chimera Standalone
+
+```bash
+# Single prompt, standard agent
+PYTHONPATH=src python -m chimera.main --prompt "Research the latest open-source vector databases" --json
+
+# Consciousness-aware interactive shell
+PYTHONPATH=src python -m chimera.main --mode consciousness
+
+# Opt in to the read-only file system tool
+PYTHONPATH=src python -m chimera.main --allow-file-system --prompt "List the files in the current directory"
+```
+
+The standalone CLI exposes web search by default. Local file-system access is available only when `--allow-file-system` is passed.
+
 ## Key Classes
 
 | Class | Module | Purpose |
@@ -100,3 +117,5 @@ Releases that are compatible with Knight Medicare are tagged `v0.x.x-km-ready`. 
 | `v0.2.0-km-ready` | Clean restructure, modules at `src/chimera/*`, shims at old paths, large files removed |
 | `v0.3.0-km-ready` | (planned) `chimera/__init__.py` fix |
 | `v0.4.0-standalone` | (planned) Standalone CLI + package restructure |
+
+The Knight Medicare integration roadmap now lives in [docs/KNIGHT_MEDICARE_INTEGRATION_PLAN.md](docs/KNIGHT_MEDICARE_INTEGRATION_PLAN.md). It reflects how KM actually consumes Chimera today: as a memory and consciousness core behind a thin FastAPI bridge.
