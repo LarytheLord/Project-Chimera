@@ -13,11 +13,7 @@ optax = "*"
 numpy = "<2.0"
 httpx = "*" # For making HTTP requests
 requests = "*"
-<<<<<<< HEAD
-googlesearch-python = "*"
-=======
 ddgs = "*"
->>>>>>> d9e3271858b857ee321d463e261256ed47f881de
 beautifulsoup4 = "*"
 lancedb = "*"
 sentence-transformers = "*"
