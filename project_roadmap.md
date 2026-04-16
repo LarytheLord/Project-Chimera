@@ -18,9 +18,9 @@
 
 | # | Feature | Status | Priority |
 |---|---------|--------|----------|
-| #9 | Fix `chimera/__init__.py` for submodule compat | Blocker | P0 |
-| #15 | Standalone CLI + dual-mode package restructure | Open | P1 |
-| #16 | Local emotion detection (HF distilroberta, 7 labels, CPU) | Open | P1 |
+| #9 | Fix `chimera/__init__.py` for submodule compat | Done | P0 |
+| #15 | Standalone CLI + dual-mode package restructure | Done | P1 |
+| #16 | Local emotion detection (HF distilroberta, 7 labels, CPU) | Done | P1 |
 | #21 | Feed Narcissus consciousness insights back into prompts | Open | P1 |
 | #17 | Reflexion self-critique + Constitutional AI guardrails | Open | P2 |
 | #18 | Local LLM fallback (SmolLM2-360M GGUF, CPU) | Open | P2 |
