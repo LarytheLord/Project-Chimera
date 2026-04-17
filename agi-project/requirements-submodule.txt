@@ -10,6 +10,6 @@ fastapi>=0.100.0
 uvicorn>=0.23.0
 
 # Optional RLHF components
-# torch>=2.0.0
-# transformers>=4.35.0
-# trl>=0.7.0
+torch>=2.0.0
+transformers>=4.35.0
+trl>=0.7.0
