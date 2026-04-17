@@ -2,10 +2,10 @@ import argparse
 import os
 import sys
 
-from chimera.agent.agent import Agent
-from chimera.agent.tool_user import FileSystemTool, ToolRegistry, WebSearchTool
-from chimera.cognitive_core.prometheus_core import PrometheusCognitiveCore
-from chimera.consciousness.conscious_agent import ConsciousnessAwareAgent
+from .agent.agent import Agent
+from .agent.tool_user import FileSystemTool, ToolRegistry, WebSearchTool
+from .cognitive_core.prometheus_core import PrometheusCognitiveCore
+from .consciousness.conscious_agent import ConsciousnessAwareAgent
 
 
 def main():

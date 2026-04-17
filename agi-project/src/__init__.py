@@ -1,1 +1,2 @@
-"""Source root for Project Chimera."""
+from .chimera import *
+__all__ = ["chimera"]
