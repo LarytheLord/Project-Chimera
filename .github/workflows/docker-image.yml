@@ -1,10 +1,13 @@
 name: Docker Image CI
 
 on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+  # Temporarily disabled push and pull_request triggers
+  # push:
+  #   branches: [ "master" ]
+  # pull_request:
+  #   branches: [ "master" ]
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
 
