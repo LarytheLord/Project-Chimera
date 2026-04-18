@@ -67,6 +67,9 @@ poetry run pytest tests/ -v
 
 # Without poetry (if you used pip install)
 PYTHONPATH=src pytest tests/ -v
+
+# Run with python
+python3 -m tests.[FileName]
 ```
 
 ## Key Classes
