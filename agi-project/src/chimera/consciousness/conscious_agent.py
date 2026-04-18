@@ -9,6 +9,7 @@ from ..agent.tool_user import ToolRegistry
 from ..cognitive_core.interfaces import CognitiveCore
 from .integration import ConsciousnessIntegration
 from .narcissus_core import NarcissusConsciousnessCore
+from .emotion import EmotionDetector
 
 if TYPE_CHECKING:
     from ..rlhf.oracle import RLHFOracle
@@ -38,6 +39,7 @@ class ConsciousnessAwareAgent:
             memory_db_path=db_path
         )
         self.consciousness_integration = ConsciousnessIntegration(self.consciousness_core)
+        self.emotion_detector = EmotionDetector()
         
         # Consciousness parameters
         self.consciousness_weight = 0.3  # How much consciousness affects decision making
@@ -91,8 +93,11 @@ class ConsciousnessAwareAgent:
                 "arguments": {"error_message": "Invalid JSON response from cognitive core or oracle."}
             }
             
+        # Detect emotion from observation
+        emotional_state = self.emotion_detector.detect_emotion(str(observation))
+            
         # Record cognitive state after making the decision
-        self._record_cognitive_state_after_action(action, prompt, context)
+        self._record_cognitive_state_after_action(action, prompt, context, emotional_state)
         
         return action
 
@@ -131,7 +136,7 @@ class ConsciousnessAwareAgent:
         
         return "\n".join(prompt_parts)
 
-    def _record_cognitive_state_after_action(self, action: Any, prompt: str, context: List[Any]):
+    def _record_cognitive_state_after_action(self, action: Any, prompt: str, context: List[Any], emotional_state: Dict[str, float] = None):
         """Record the cognitive state after taking an action"""
         
         # Extract attention weights (simplified - in reality these would come from the model)
@@ -161,7 +166,8 @@ class ConsciousnessAwareAgent:
             decision_path=decision_path,
             confidence=confidence,
             memory_context=memory_context,
-            processing_load=processing_load
+            processing_load=processing_load,
+            emotional_state=emotional_state
         )
 
     def _act(self, action: Any) -> Any:

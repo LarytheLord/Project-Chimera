@@ -2,9 +2,9 @@ from typing import Any
 
 import pytest
 
-from chimera.consciousness.integration import ConsciousnessIntegration
-from chimera.consciousness.narcissus_core import NarcissusConsciousnessCore
-from chimera.cognitive_core.interfaces import CognitiveCore
+from src import ConsciousnessIntegration
+from src import NarcissusConsciousnessCore
+from src import CognitiveCore
 
 
 class FakeVectorEpisodicMemory:

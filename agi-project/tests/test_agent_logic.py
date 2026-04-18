@@ -3,10 +3,10 @@ from typing import Any, Dict
 
 import pytest
 
-from chimera.agent.agent import Agent
-from chimera.agent.memory import Experience
-from chimera.agent.tool_user import Tool, ToolRegistry
-from chimera.cognitive_core.interfaces import CognitiveCore
+from src import Agent
+from src import Experience
+from src import Tool, ToolRegistry
+from src import CognitiveCore
 
 # --- Mock Components ---
 
