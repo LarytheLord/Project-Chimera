@@ -11,9 +11,9 @@ WORKDIR /app
 
 # Install Poetry for dependency management
 RUN pip install poetry
-
 # Copy dependency definitions
-COPY pyproject.toml poetry.lock* ./
+COPY agi-project/pyproject.toml agi-project/poetry.lock* ./
+
 
 # Install dependencies and the Chimera package itself
 RUN poetry install
