@@ -67,6 +67,13 @@ poetry run pytest tests/ -v
 
 # Without poetry (if you used pip install)
 PYTHONPATH=src pytest tests/ -v
+<<<<<<< HEAD
+=======
+
+# Run with python
+python3 -m tests.[FileName]
+```
+>>>>>>> b4b8e62 (Change rmd)
 
 # Run with python
 python3 -m tests.[FileName]
