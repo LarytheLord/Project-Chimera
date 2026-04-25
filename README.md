@@ -41,6 +41,7 @@ A modular cognitive architecture for building self-aware AI agents. Chimera comb
 | **RLHF** | Reward model (distilbert) scores candidate responses. Oracle selects the best. Trains on preference data. | $0 (CPU training) |
 | **LLM Backend** | Gemini 1.5 Flash via API (1,500 req/day free tier). Async + sync support. | $0 (free tier) |
 | **Tool Use** | Extensible tool registry with JSON schemas. Built-in: web search, file system. Pluggable: therapy tools, custom tools. | $0 |
+| **Event Bus** | Pluggable Kafka/Redpanda event bus (`chimera.eventbus`). Every perception, action, tool call, memory write, and metacognitive reflection is published as a structured event with a per-cycle `trace_id` for replay. Falls back to `NullEventBus` when no broker is configured. | $0 (Redpanda local) |
 
 **Total infrastructure cost: $0**
 
@@ -64,9 +65,17 @@ src/chimera/
 │   ├── integration.py       #   ConsciousnessIntegration (bridge to agent)
 │   └── conscious_agent.py   #   ConsciousnessAwareAgent (Agent + Narcissus combined)
 │
-└── rlhf/                    # Reinforcement Learning from Human Feedback
-    ├── reward_model.py      #   RewardModel (distilbert fine-tuning via TRL)
-    └── oracle.py            #   RLHFOracle (scores + selects best response)
+├── rlhf/                    # Reinforcement Learning from Human Feedback
+│   ├── reward_model.py      #   RewardModel (distilbert fine-tuning via TRL)
+│   └── oracle.py            #   RLHFOracle (scores + selects best response)
+│
+└── eventbus/                # Durable event bus (Kafka / Redpanda)
+    ├── events.py            #   Event dataclass + topic constants
+    ├── bus.py               #   EventBus ABC, Null + InMemory implementations
+    ├── kafka_bus.py         #   KafkaEventBus (kafka-python)
+    ├── replay.py            #   KafkaTopicConsumer + TraceReplayer
+    ├── config.py            #   EventBusConfig (env-driven)
+    └── factory.py           #   build_event_bus() dispatcher
 ```
 
 ## Quick Start
@@ -247,6 +256,106 @@ python scripts/train_reward_model.py
 
 # 3. Use in agent (see "Run with RLHF" above)
 ```
+
+### Event Bus (Kafka / Redpanda)
+
+Chimera publishes every step of the agent loop as a structured event so
+modules can evolve independently and entire agent traces can be replayed
+for debugging and research.
+
+**Topics**
+
+| Topic | When emitted | Key payload fields |
+|-------|--------------|--------------------|
+| `chimera.perception`        | Each perceive step | `observation` |
+| `chimera.actions`           | After `_think` selects an action | `action`, `num_candidates`, `recalled_count` |
+| `chimera.tool_calls`        | Tool invoke + tool result | `tool_name`, `arguments`, `outcome`, `is_error`, `phase` |
+| `chimera.memory_writes`     | Each episodic memory write | `kind`, `observation`, `action`, `outcome` |
+| `chimera.metacog_reflections` | Narcissus cognitive-state record | `thought_process`, `attention_weights`, `confidence`, `self_reflection` |
+| `chimera.agent_traces`      | Loop start, cycle complete, loop end | `phase`, `tool_name`, `is_error` |
+
+Every event carries:
+
+```json
+{
+  "event_id":   "uuid",
+  "trace_id":   "uuid (shared by all events in one perceive→think→act cycle)",
+  "session_id": "uuid (one per Agent run)",
+  "agent_id":   "string",
+  "event_type": "perception | action_selected | tool_invoke | tool_result | memory_write | cognitive_state | cycle_complete | ...",
+  "timestamp":  1714000000.123,
+  "schema_version": 1,
+  "payload":    { ... topic-specific ... }
+}
+```
+
+`trace_id` is also used as the Kafka partition key, so all events from a
+single agent cycle land on the same partition and stay in order.
+
+**Run a local broker (Redpanda)**
+
+```bash
+cd agi-project
+docker compose up -d            # Redpanda + Console UI on :8080
+export CHIMERA_KAFKA_BROKERS=localhost:9092
+
+# Optional: pre-create topics with 7-day retention
+python scripts/create_kafka_topics.py
+```
+
+**Run the agent against the bus**
+
+```bash
+poetry run python -m chimera.cli \
+    --task "Summarize the latest LLM papers" \
+    --kafka-brokers localhost:9092
+```
+
+Or programmatically:
+
+```python
+from chimera import Agent, build_event_bus, EventBusConfig
+
+bus = build_event_bus(EventBusConfig(bootstrap_servers=["localhost:9092"]))
+agent = Agent(cognitive_core=core, tool_registry=tools,
+              db_path="./chimera_db", event_bus=bus)
+agent.run_main_loop({"task": "..."})
+bus.close()
+```
+
+If `CHIMERA_KAFKA_BROKERS` is unset (or `kafka-python` is not installed),
+`build_event_bus()` returns a `NullEventBus` and Chimera runs unchanged —
+the bus is strictly additive.
+
+**Replay an agent trace**
+
+```python
+from chimera.eventbus import EventBusConfig
+from chimera.eventbus.replay import TraceReplayer
+
+cfg = EventBusConfig(bootstrap_servers=["localhost:9092"])
+replayer = TraceReplayer(cfg)
+
+groups = replayer.group_by_trace(max_events=500)
+for trace_id, events in groups.items():
+    print(f"--- cycle {trace_id} ({len(events)} events) ---")
+    for e in events:
+        print(f"  {e.event_type:20s} {e.topic}")
+```
+
+In tests, swap the bus for `InMemoryEventBus` and assert on
+`bus.history(topic)` — see `tests/test_eventbus.py` for the full pattern.
+
+**Configuration env vars**
+
+| Var | Purpose |
+|-----|---------|
+| `CHIMERA_KAFKA_BROKERS`     | Comma-separated bootstrap servers. Empty = bus disabled. |
+| `CHIMERA_KAFKA_CLIENT_ID`   | Producer client id (default `chimera-agent`). |
+| `CHIMERA_KAFKA_TOPIC_PREFIX`| Optional prefix for topic isolation (e.g. `dev.`). |
+| `CHIMERA_AGENT_ID`          | Stamped onto every event. |
+| `CHIMERA_SESSION_ID`        | Stamped onto every event; auto-generated if unset. |
+| `CHIMERA_EVENTBUS_ENABLED`  | Set to `0` to force `NullEventBus` even when brokers are configured. |
 
 ## Integration: Knight Medicare
 

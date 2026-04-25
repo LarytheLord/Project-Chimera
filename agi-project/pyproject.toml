@@ -23,6 +23,8 @@ pyarrow = "~16.1.0"
 datasets = "~2.19.1"
 transformers = "~4.41.2"
 trl = "~0.9.4"
+# Event bus (Kafka / Redpanda) — pure-Python client, no librdkafka.
+kafka-python = "^2.0"
 # Rust FFI libraries will be added here as they are developed
 
 [tool.poetry.group.dev.dependencies]

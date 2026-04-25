@@ -1,0 +1,68 @@
+version: "3.8"
+
+# Local development stack for Project Chimera.
+#
+# Brings up a single-node Redpanda broker (Kafka API compatible) and the
+# Redpanda Console UI. Redpanda is dramatically lighter than the full
+# Kafka + Zookeeper combo and is the recommended option for local dev.
+#
+# Usage:
+#   cd agi-project
+#   docker compose up -d
+#   export CHIMERA_KAFKA_BROKERS=localhost:9092
+#   poetry run python -m chimera.cli --task "..." --kafka-brokers localhost:9092
+#
+# Console UI: http://localhost:8080
+# Kafka API:  localhost:9092
+# Schema reg: localhost:8081
+# Pandaproxy: localhost:8082
+#
+# Topics are auto-created on first publish. To pre-create with sane retention
+# settings see scripts/create_kafka_topics.py.
+
+services:
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    container_name: chimera-redpanda
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9094,external://0.0.0.0:9092
+      - --advertise-kafka-addr internal://redpanda:9094,external://localhost:9092
+      - --pandaproxy-addr internal://0.0.0.0:8083,external://0.0.0.0:8082
+      - --advertise-pandaproxy-addr internal://redpanda:8083,external://localhost:8082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:8081
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      - --mode dev-container
+      - --smp 1
+      - --default-log-level=info
+    ports:
+      - "9092:9092"     # Kafka API (external)
+      - "8081:8081"     # Schema Registry
+      - "8082:8082"     # Pandaproxy (REST)
+      - "9644:9644"     # Admin API
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health --exit-when-healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  console:
+    image: redpandadata/console:v2.7.2
+    container_name: chimera-redpanda-console
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: redpanda:9094
+      KAFKA_SCHEMAREGISTRY_ENABLED: "true"
+      KAFKA_SCHEMAREGISTRY_URLS: http://redpanda:8081
+    ports:
+      - "8080:8080"
+
+volumes:
+  redpanda-data:
+    driver: local

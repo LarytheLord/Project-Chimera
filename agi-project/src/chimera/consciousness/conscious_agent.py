@@ -2,11 +2,13 @@
 Consciousness-aware agent that integrates the Narcissus system with Project Chimera's agent functionality
 """
 import json
-from typing import TYPE_CHECKING, Any, Dict, List
+import uuid
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..agent.memory import Experience, VectorEpisodicMemory, WorkingMemory
 from ..agent.tool_user import ToolRegistry
 from ..cognitive_core.interfaces import CognitiveCore
+from ..eventbus import EventBus, NullEventBus, Topics
 from .integration import ConsciousnessIntegration
 from .narcissus_core import NarcissusConsciousnessCore
 from .emotion import EmotionDetector
@@ -17,14 +19,17 @@ if TYPE_CHECKING:
 
 class ConsciousnessAwareAgent:
     """An agent that incorporates self-awareness and consciousness simulation"""
-    
-    def __init__(self, 
-                 cognitive_core: CognitiveCore, 
-                 tool_registry: ToolRegistry, 
-                 db_path: str, 
-                 rlhf_oracle: "RLHFOracle" = None, 
-                 num_candidates: int = 3):
-        
+
+    def __init__(self,
+                 cognitive_core: CognitiveCore,
+                 tool_registry: ToolRegistry,
+                 db_path: str,
+                 rlhf_oracle: "RLHFOracle" = None,
+                 num_candidates: int = 3,
+                 event_bus: Optional[EventBus] = None,
+                 agent_id: Optional[str] = None,
+                 session_id: Optional[str] = None):
+
         # Initialize the base components
         self.cognitive_core = cognitive_core
         self.tool_registry = tool_registry
@@ -32,20 +37,29 @@ class ConsciousnessAwareAgent:
         self.episodic_memory = VectorEpisodicMemory(db_path=db_path)
         self.rlhf_oracle = rlhf_oracle
         self.num_candidates = num_candidates
-        
+        self.event_bus: EventBus = event_bus or NullEventBus()
+        self.agent_id = agent_id or "chimera-conscious-agent"
+        self.session_id = session_id or str(uuid.uuid4())
+
         # Initialize the consciousness system
         self.consciousness_core = NarcissusConsciousnessCore(
             cognitive_core=cognitive_core,
             memory_db_path=db_path
         )
-        self.consciousness_integration = ConsciousnessIntegration(self.consciousness_core)
+        self.consciousness_integration = ConsciousnessIntegration(
+            self.consciousness_core,
+            event_bus=self.event_bus,
+            agent_id=self.agent_id,
+            session_id=self.session_id,
+        )
         self.emotion_detector = EmotionDetector()
-        
+
         # Consciousness parameters
         self.consciousness_weight = 0.3  # How much consciousness affects decision making
         self.self_reflection_enabled = True
         self.introspection_frequency = 10  # Perform introspection every 10 cycles
         self.cycle_count = 0
+        self._current_trace_id: Optional[str] = None
         
     def _think(self, observation: Any) -> Any:
         """Enhanced thinking process with consciousness awareness"""
@@ -167,7 +181,8 @@ class ConsciousnessAwareAgent:
             confidence=confidence,
             memory_context=memory_context,
             processing_load=processing_load,
-            emotional_state=emotional_state
+            emotional_state=emotional_state,
+            trace_id=self._current_trace_id,
         )
 
     def _act(self, action: Any) -> Any:
@@ -182,34 +197,115 @@ class ConsciousnessAwareAgent:
             outcome = {"source_tool": action.get("tool_name", "unknown_tool"), "data": {"text_data": str(e)}, "is_error": True}
         return outcome
 
+    def _emit(self, topic: str, payload: dict, *, trace_id: str, event_type: Optional[str] = None) -> None:
+        try:
+            self.event_bus.publish(
+                topic,
+                payload,
+                trace_id=trace_id,
+                session_id=self.session_id,
+                agent_id=self.agent_id,
+                event_type=event_type,
+            )
+        except Exception:  # pragma: no cover - defensive
+            pass
+
     def run_main_loop(self, initial_observation: Any):
         """Run the main perceive-think-act loop with consciousness awareness"""
         observation = initial_observation
         self.working_memory.add(observation)
 
         print("Consciousness-aware agent loop started...")
-        
-        while True:  # The loop runs continuously
-            action = self._think(observation)
-            self.working_memory.add(action)
 
-            outcome = self._act(action)
-            self.working_memory.add(outcome)
+        self._emit(
+            Topics.AGENT_TRACES,
+            {"phase": "loop_start", "initial_observation": initial_observation, "conscious": True},
+            trace_id=self.session_id,
+            event_type="loop_start",
+        )
 
-            formatted_experience = Experience(
-                observation=observation,
-                action=action,
-                outcome=outcome
+        try:
+            while True:  # The loop runs continuously
+                trace_id = str(uuid.uuid4())
+                self._current_trace_id = trace_id
+                self._emit(
+                    Topics.PERCEPTION,
+                    {"observation": observation},
+                    trace_id=trace_id,
+                    event_type="perception",
+                )
+
+                action = self._think(observation)
+                self.working_memory.add(action)
+                self._emit(
+                    Topics.ACTIONS,
+                    {"action": action},
+                    trace_id=trace_id,
+                    event_type="action_selected",
+                )
+
+                outcome = self._act(action)
+                self.working_memory.add(outcome)
+                self._emit(
+                    Topics.TOOL_CALLS,
+                    {
+                        "tool_name": action.get("tool_name"),
+                        "is_error": outcome.get("is_error", False),
+                        "outcome": outcome,
+                        "phase": "result",
+                    },
+                    trace_id=trace_id,
+                    event_type="tool_result",
+                )
+
+                formatted_experience = Experience(
+                    observation=observation,
+                    action=action,
+                    outcome=outcome
+                )
+                self.episodic_memory.remember(formatted_experience)
+                self._emit(
+                    Topics.MEMORY_WRITES,
+                    {
+                        "kind": "episodic",
+                        "observation": observation,
+                        "action": action,
+                        "outcome": outcome,
+                    },
+                    trace_id=trace_id,
+                    event_type="memory_write",
+                )
+
+                self._emit(
+                    Topics.AGENT_TRACES,
+                    {
+                        "phase": "cycle_complete",
+                        "tool_name": action.get("tool_name"),
+                        "is_error": outcome.get("is_error", False),
+                    },
+                    trace_id=trace_id,
+                    event_type="cycle_complete",
+                )
+
+                observation = outcome
+
+                print(f"---\nObservation: {str(observation)[:200]}...\nAction: {action}\nOutcome: {str(outcome)[:200]}...\n---")
+
+                if "exit" in action.get("tool_name", ""):
+                    print("Exit condition met. Shutting down agent loop.")
+                    break
+        finally:
+            self._current_trace_id = None
+            self._emit(
+                Topics.AGENT_TRACES,
+                {"phase": "loop_end"},
+                trace_id=self.session_id,
+                event_type="loop_end",
             )
-            self.episodic_memory.remember(formatted_experience)
-
-            observation = outcome
-
-            print(f"---\nObservation: {str(observation)[:200]}...\nAction: {action}\nOutcome: {str(outcome)[:200]}...\n---")
-
-            if "exit" in action.get("tool_name", ""):
-                print("Exit condition met. Shutting down agent loop.")
-                break
+            try:
+                self.event_bus.flush(timeout=5)
+            except Exception:  # pragma: no cover - defensive
+                pass
 
     def enable_self_reflection(self):
         """Enable self-reflection capabilities"""
