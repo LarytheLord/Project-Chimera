@@ -1,6 +1,7 @@
 name: Docker Image CI
 
 on:
+  workflow_dispatch:
   # Temporarily disabled push and pull_request triggers
   # push:
   #   branches: [ "master" ]
