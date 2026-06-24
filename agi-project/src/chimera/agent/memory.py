@@ -4,23 +4,22 @@ import json
 from collections import deque
 import os
 from typing import Any, List, NamedTuple
-
+from langchain.messages import HumanMessage,AIMessage
 # Placeholder for protobuf messages
 # from ..protos import core_pb2
 
 
 def _load_vector_dependencies():
     try:
-        import lancedb
-        import pyarrow as pa
-        from sentence_transformers import SentenceTransformer
-    except ImportError as exc:
+        from langchain_chroma import Chroma
+        from langchain_huggingface import HuggingFaceEmbeddings as SentenceTransformerEmbeddings
+    except Exception as exc:
         raise ImportError(
-            "VectorEpisodicMemory requires lancedb, pyarrow, and sentence-transformers. "
-            "Install requirements-submodule.txt to enable vector memory."
+            "VectorEpisodicMemory requires langchain and chromadb (Chroma). "
+            "Install the appropriate dependencies (e.g. requirements-submodule.txt) to enable vector memory."
         ) from exc
 
-    return lancedb, pa, SentenceTransformer
+    return Chroma, SentenceTransformerEmbeddings
 
 class Experience(NamedTuple):
     """Represents a single experience tuple for the agent."""
@@ -47,41 +46,31 @@ class WorkingMemory:
         self.history.clear()
 
 class VectorEpisodicMemory:
-    """Manages the agent's long-term, searchable memory of past experiences using a vector database."""
+    """Manages the agent's long-term, searchable memory of past experiences using LangChain Chroma."""
 
-    def __init__(self, db_path: str, table_name: str = "experiences"):
+    def __init__(self, persist_path: str, collection_name: str = "experiences"):
         """
-        Initializes the vector-based episodic memory.
+        Initializes the Chroma-backed episodic memory.
 
         Args:
-            db_path: Path to the LanceDB database directory.
-            table_name: Name of the table to store experiences.
+            persist_path: Directory where Chroma will persist its data.
+            collection_name: Name of the Chroma collection to store experiences.
         """
-        print("Initializing VectorEpisodicMemory...")
-        lancedb, pa, sentence_transformer = _load_vector_dependencies()
-        self._pa = pa
-        # Use a lightweight, high-performance model suitable for local execution
-        self.model = sentence_transformer('all-MiniLM-L6-v2', device='cpu') # Force CPU usage
-        
-        db_uri = os.path.join(db_path, "lancedb")
-        os.makedirs(db_uri, exist_ok=True)
-        db = lancedb.connect(db_uri)
-        
-        self.table = self._get_or_create_table(db, table_name)
-        print("VectorEpisodicMemory initialized successfully.")
+        print("Initializing VectorEpisodicMemory (Chroma)...")
+        Chroma, SentenceTransformerEmbeddings = _load_vector_dependencies()
 
-    def _get_or_create_table(self, db, table_name):
-        if table_name in db.table_names():
-            return db.open_table(table_name)
-        else:
-            embedding_dim = self.model.get_sentence_embedding_dimension()
-            schema = self._pa.schema([
-                self._pa.field("vector", self._pa.list_(self._pa.float32(), embedding_dim)),
-                self._pa.field("observation_text", self._pa.string()),
-                self._pa.field("action_text", self._pa.string()),
-                self._pa.field("outcome_text", self._pa.string())
-            ])
-            return db.create_table(table_name, schema=schema)
+        # Lightweight sentence-transformers model for local use
+        self.embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+
+        self.persist_path = os.path.join(persist_path, "chroma")
+        os.makedirs(self.persist_path, exist_ok=True)
+
+        # Create/open the Chroma vectorstore
+        self.store = Chroma(persist_directory=self.persist_path,
+                            collection_name=collection_name,
+                            embedding_function=self.embeddings)
+
+        print("VectorEpisodicMemory (Chroma) initialized successfully.")
 
     def _experience_to_text(self, experience: Experience) -> str:
         """Converts an Experience object into a single string for embedding."""
@@ -90,42 +79,52 @@ class VectorEpisodicMemory:
         out = json.dumps(experience.outcome)
         return f"Observation: {obs}\nAction: {act}\nOutcome: {out}"
 
-    def _to_vector_list(self, embedding: Any) -> List[float]:
-        """Normalizes encoder outputs to a plain Python list."""
-        if hasattr(embedding, "tolist"):
-            return embedding.tolist()
-        return list(embedding)
+    def remember(self, experience: Experience, doc_id: str = None):
+        """Stores a new experience in the Chroma vectorstore.
 
-    def remember(self, experience: Experience):
-        """Stores a new experience in the vector database."""
-        text_to_embed = self._experience_to_text(experience)
-        vector = self._to_vector_list(self.model.encode(text_to_embed))
-
-        data = {
-            "vector": vector,
+        Args:
+            experience: The Experience tuple to store.
+            doc_id: Optional unique id for the document in Chroma.
+        """
+        text = self._experience_to_text(experience)
+        metadata = {
             "observation_text": json.dumps(experience.observation),
             "action_text": json.dumps(experience.action),
             "outcome_text": json.dumps(experience.outcome)
         }
-        self.table.add([data])
-        print(f"--- Remembered new experience ---")
+
+        # Chroma will compute embeddings via the provided embedding function
+        if doc_id is not None:
+            self.store.add_texts([text], metadatas=[metadata], ids=[doc_id])
+        else:
+            self.store.add_texts([text], metadatas=[metadata])
+
+        # Persist to disk if supported
+        try:
+            self.store.persist()
+        except Exception:
+            pass
+
+        print("--- Remembered new experience (Chroma) ---")
 
     def recall(self, query: str, top_k: int = 5) -> List[Experience]:
-        """Recalls the most relevant experiences based on semantic similarity."""
-        if self.table.count_rows() == 0:
+        """Recalls the most relevant experiences based on semantic similarity using Chroma."""
+        # If there are no documents, return empty
+        try:
+            # similarity_search returns a list of langchain Document objects
+            results = self.store.similarity_search(query, k=top_k)
+        except Exception:
             return []
-            
-        query_vector = self._to_vector_list(self.model.encode(query))
-        results = self.table.search(query_vector).limit(top_k).to_df()
 
-        recalled_experiences = []
-        for _, row in results.iterrows():
+        recalled_experiences: List[Experience] = []
+        for doc in results:
+            md = doc.metadata or {}
             exp = Experience(
-                observation=json.loads(row['observation_text']),
-                action=json.loads(row['action_text']),
-                outcome=json.loads(row['outcome_text'])
+                observation=json.loads(md.get("observation_text", "null") or "null"),
+                action=json.loads(md.get("action_text", "null") or "null"),
+                outcome=json.loads(md.get("outcome_text", "null") or "null")
             )
             recalled_experiences.append(exp)
-        
+
         print(f"--- Recalled {len(recalled_experiences)} experiences for query: '{query}' ---")
         return recalled_experiences

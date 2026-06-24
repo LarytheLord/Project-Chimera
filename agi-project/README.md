@@ -68,8 +68,11 @@ poetry run pytest tests/ -v
 # Without poetry (if you used pip install)
 PYTHONPATH=src pytest tests/ -v
 
-#Run Each file
+# Run Each file
 python3 tests.[FileName]
+
+# Use this file to run  main Agent
+python3 tests.test_agent_graph
 ```
 ## Key Classes
 
