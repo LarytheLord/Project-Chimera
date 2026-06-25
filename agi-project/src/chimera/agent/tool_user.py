@@ -4,7 +4,9 @@ import abc
 import json
 import os
 from typing import Any, Dict, List
-from langchain_core.tools import tool   
+
+from langchain_core.tools import tool
+
 class Tool(abc.ABC):
     """Abstract Base Class for a tool that the agent can use."""
 
@@ -119,7 +121,8 @@ class WebSearchTool(Tool):
             return f"Scraped content from {url}:\n{text[:1000]}..." # Return first 1000 chars
         except Exception as e:
             return f"Error scraping {url}: {e}"
-@tool
+
+
 class FileSystemTool(Tool):
     """A tool for interacting with the local file system."""
 
@@ -174,3 +177,5 @@ class FileSystemTool(Tool):
             return f"Error: Path '{path}' is not a valid file."
         with open(path, 'r', encoding='utf-8') as f:
             return f.read()
+
+

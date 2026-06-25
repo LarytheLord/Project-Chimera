@@ -20,14 +20,7 @@ if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 
 from chimera.agent.memory import WorkingMemory, VectorEpisodicMemory, Experience
-tool_path = pathlib.Path(__file__).resolve().parents[1] / "src" / "chimera" / "agent" / "memory.py"
-spec = importlib.util.spec_from_file_location("src.chimera.agent.memory", str(tool_path))
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
 
-WorkingMemory = mod.WorkingMemory
-VectorEpisodicMemory = mod.VectorEpisodicMemory
-Experience = mod.Experience
 load_dotenv()
 
 class AgentState(TypedDict):
