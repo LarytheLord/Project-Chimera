@@ -68,11 +68,12 @@ poetry run pytest tests/ -v
 # Without poetry (if you used pip install)
 PYTHONPATH=src pytest tests/ -v
 
-# Run Each file
-python3 tests.[FileName]
+
 
 # Use this file to run  main Agent
-python3 tests.test_agent_graph
+$env:PYTHON="."
+#then click on run button or 
+python3 agi_project/tests/yeay_agent_graph.py
 ```
 ## Key Classes
 

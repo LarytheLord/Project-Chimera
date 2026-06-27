@@ -10,16 +10,12 @@ from langgraph.graph import StateGraph, START, END
 from dotenv import load_dotenv
 
 # Tools import
-from langchain_core.messages import BaseMessage,SystemMessage,ToolMessage
+from langchain_core.messages import BaseMessage,SystemMessage,ToolMessage,AIMessage,HumanMessage
 from langgraph.graph.message import add_messages
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode
 
-# Ensure src is importable when tests run directly
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SRC_PATH = os.path.join(ROOT, "src")
-if SRC_PATH not in sys.path:
-    sys.path.insert(0, SRC_PATH)
+
 
 #local import
 from agi_project.src.chimera.agent.memory import WorkingMemory,VectorEpisodicMemory, Experience
@@ -89,16 +85,28 @@ def print_stream(stream):
         message = s["messages"][-1]
         if isinstance(message, tuple):
             print(message)
-            m.add(message)
+            #conver to appropriate BaseMassage
+            if message[0]=="user":
+                m.add(HumanMessage(content=message[1]))
+            else:
+                m.add(AIMessage(content=message[1]))
         else:
             message.pretty_print()
             m.add(message)
 
 
-user_input = input("Enter: ")
-while user_input != "exit":
-    print_stream(agent.stream(user_input, stream_mode="values"))
-    user_input = input("Enter: ")
+user_input_str = ""
+while user_input_str.lower() != "exit":
+    user_input_str = input("Enter: ")
+    if user_input_str.lower() == "exit":
+        break
+    # Add the current input as HummanMessage to working memory
+    new_user_message = HumanMessage(content=user_input_str)
+    m.add(new_user_message)
+
+    # Pass Message  history 
+    input_for_agent = {"messages": m.get_context()}
+    print_stream(agent.stream(input_for_agent, stream_mode="values"))
 
 # Ask whether to save the session into VectorEpisodicMemory
 save_choice = input("Save session to vector DB? (y/n): ").strip().lower()
