@@ -12,7 +12,7 @@ WORKDIR /app
 # Install Poetry for dependency management
 RUN pip install poetry
 # Copy dependency definitions
-COPY agi_project/pyproject.toml agi_project/poetry.lock* ./agi-project/
+COPY agi_project/pyproject.toml agi_project/poetry.lock* ./agi_project/
 
 # Install dependencies only
 RUN cd agi_project && poetry install --no-root
