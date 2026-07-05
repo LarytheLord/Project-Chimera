@@ -12,16 +12,16 @@ WORKDIR /app
 # Install Poetry for dependency management
 RUN pip install poetry
 # Copy dependency definitions
-COPY agi-project/pyproject.toml agi-project/poetry.lock* ./agi-project/
+COPY agi_project/pyproject.toml agi_project/poetry.lock* ./agi-project/
 
 # Install dependencies only
-RUN cd agi-project && poetry install --no-root
+RUN cd agi_project && poetry install --no-root
 
 # Copy the rest of the application's code
 COPY . .
 
 # Install the project itself
-RUN cd agi-project && poetry install
+RUN cd agi_project && poetry install
 
 # Library image smoke check
 CMD ["poetry", "run", "python", "-c", "import chimera; print('Project Chimera library image ready')"]
