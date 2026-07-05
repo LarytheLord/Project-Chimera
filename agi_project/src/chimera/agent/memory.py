@@ -4,7 +4,6 @@ import json
 from collections import deque
 import os
 from typing import Any, List, NamedTuple
-from langchain.messages import HumanMessage,AIMessage
 # Placeholder for protobuf messages
 # from ..protos import core_pb2
 
@@ -12,14 +11,14 @@ from langchain.messages import HumanMessage,AIMessage
 def _load_vector_dependencies():
     try:
         from langchain_chroma import Chroma
-        from langchain_huggingface import HuggingFaceEmbeddings as SentenceTransformerEmbeddings
+        from langchain_ollama import OllamaEmbeddings
     except Exception as exc:
         raise ImportError(
-            "VectorEpisodicMemory requires langchain and chromadb (Chroma). "
+            "VectorEpisodicMemory requires langchain_ollama and chromadb (Chroma). "
             "Install the appropriate dependencies (e.g. requirements-submodule.txt) to enable vector memory."
         ) from exc
 
-    return Chroma, SentenceTransformerEmbeddings
+    return Chroma, OllamaEmbeddings
 
 class Experience(NamedTuple):
     """Represents a single experience tuple for the agent."""
@@ -59,8 +58,8 @@ class VectorEpisodicMemory:
         print("Initializing VectorEpisodicMemory (Chroma)...")
         Chroma, SentenceTransformerEmbeddings = _load_vector_dependencies()
 
-        # Lightweight sentence-transformers model for local use
-        self.embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+        # Lightweight Ollama embedding model for local use
+        self.embeddings = SentenceTransformerEmbeddings(model="qwen3-embedding:0.6b")
 
         self.persist_path = os.path.join(persist_path, "chroma")
         os.makedirs(self.persist_path, exist_ok=True)

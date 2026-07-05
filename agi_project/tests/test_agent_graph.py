@@ -138,11 +138,11 @@ while user_input_str.lower() != "exit":
 # Ask whether to save the session into VectorEpisodicMemory
 save_choice = input("Save session to vector DB? (y/n): ").strip().lower()
 if save_choice == "y":
-    persist_dir = os.path.join(ROOT, "chroma_persist")
+    persist_dir = os.path.join(os.getcwd(), "chroma_persist")
     vm = VectorEpisodicMemory(persist_path=persist_dir, collection_name="sessions")
 
     for idx, message in enumerate(m.get_context()):
-        role = "human" if message[-1]=="User" else "ai"
+        role = "human" if getattr(message, "type", "") == "human" else "ai"
         obs = {"role": role, "content": message.content}
         action = {"type": "message", "index": idx}
         outcome = {}
