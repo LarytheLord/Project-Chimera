@@ -178,4 +178,47 @@ class FileSystemTool(Tool):
         with open(path, 'r', encoding='utf-8') as f:
             return f.read()
 
+# Terminal executation tools
+class Terminal_exute(Tool):
+    """This tool will execute all command and returns it output"""
+    @property
+    def name(self) -> str:
+        return "Terminal_exute"
+
+    @property
+    def description(self) -> str:
+        return "Performs execution of the command in terminal"
+    def get_schema(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "description": "The operation to perform.",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "command"
+                    }
+                },
+                "required": "command"
+            }
+        }
+    def __call__(self,command: str) -> str:
+        self.command = command.split(" ")
+        import os
+        import subprocess
+
+
+        # To execute a shell command like npm install:
+        result = subprocess.run(self.command,capture_output=True,text=True)
+        print(result.stdout)
+        if result.returncode != 0 :
+            return f"\nError {result.stderr}"
+        return result
+    
+
 

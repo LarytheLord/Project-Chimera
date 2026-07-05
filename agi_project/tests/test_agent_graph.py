@@ -5,7 +5,9 @@ from uuid import uuid4
 from typing import TypedDict, Annotated, Sequence
 
 # LLM import
+from langchain_ollama import ChatOllama
 from langchain_openrouter import ChatOpenRouter
+from langchain_core import exceptions
 from langgraph.graph import StateGraph, START, END
 from dotenv import load_dotenv
 
@@ -19,7 +21,7 @@ from langgraph.prebuilt import ToolNode
 
 #local import
 from agi_project.src.chimera.agent.memory import WorkingMemory,VectorEpisodicMemory, Experience
-from agi_project.src.chimera.agent.tool_user import FileSystemTool
+from agi_project.src.chimera.agent.tool_user import FileSystemTool,Terminal_exute
 load_dotenv()
 
 class AgentState(TypedDict):
@@ -27,6 +29,7 @@ class AgentState(TypedDict):
 
 
 _fs = FileSystemTool()
+_te = Terminal_exute()
 
 @tool
 def read_file(path:str) -> str:
@@ -39,10 +42,34 @@ def list_directory(path:str) -> str:
     """This function list_directory
         Args: parent directory path"""
     return _fs(operation="list_directory",path=path)
-tools = [read_file,list_directory]
 
-llm = ChatOpenRouter(
-    model="poolside/laguna-xs.2:free", temperature = 0,max_tokens=500).bind_tools(tools)
+@tool
+def list_current_directory() -> str:
+    """This function will return current directory list"""
+    d = os.getcwd()
+    return _fs(operation="list_directory",path=d)
+
+@tool
+def execute_command(command:  str) -> str:
+    """This command will execute the code
+       Args: Find the operating system using os_find tool and search for command 
+              and  pass it"""
+    return _te(command)
+@tool
+def os_find() -> str:
+    """This tool will find which operating system we are working with"""
+    import platform
+    return platform.system()
+
+tools = [read_file,list_directory,list_current_directory,execute_command,os_find]
+try:
+    llm = ChatOpenRouter(model="poolside/laguna-xs.2:free", temperature = 0,max_tokens=500).bind_tools(tools)
+except Exception as e:
+    llm = ChatOllama(model="qwen3.5:0.8b", temperature = 0,max_tokens=500).bind_tools(tools)
+except Exception as e:
+    print(e)
+    raise
+    
 
 def process(state: AgentState) -> AgentState:
     """This node will solve the request you input"""

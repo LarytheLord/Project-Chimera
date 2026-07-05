@@ -73,7 +73,9 @@ PYTHONPATH=src pytest tests/ -v
 # Use this file to run  main Agent
 $env:PYTHON="."
 #then click on run button or 
-python3 agi_project/tests/yeay_agent_graph.py
+python3 agi_project/tests/test_agent_graph.py
+#or
+python3 -m agi_project.tests.test_agent_graph
 ```
 ## Key Classes
 
