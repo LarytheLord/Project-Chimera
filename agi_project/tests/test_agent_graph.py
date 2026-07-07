@@ -31,6 +31,9 @@ class AgentState(TypedDict):
 _fs = FileSystemTool()
 _te = Terminal_exute()
 
+persist_dir = os.path.join(os.getcwd(), "chroma_persist")
+vm = VectorEpisodicMemory(persist_path=persist_dir, collection_name="sessions")
+
 @tool
 def read_file(path:str) -> str:
     """This function read the file
@@ -75,8 +78,9 @@ def process(state: AgentState) -> AgentState:
     """This node will solve the request you input"""
     systempompt = SystemMessage(
         "You are my AI assistant, please answer my query to the best of your ability."
+
     )
-    response = llm.invoke([systempompt]+state["messages"])
+    response = llm.invoke([systempompt]+state["messages"]+vm.recall(state["messages"], top_k=3))
     return {"messages": [response]}
 
 def should_continue(state: AgentState): 
@@ -138,8 +142,6 @@ while user_input_str.lower() != "exit":
 # Ask whether to save the session into VectorEpisodicMemory
 save_choice = input("Save session to vector DB? (y/n): ").strip().lower()
 if save_choice == "y":
-    persist_dir = os.path.join(os.getcwd(), "chroma_persist")
-    vm = VectorEpisodicMemory(persist_path=persist_dir, collection_name="sessions")
 
     for idx, message in enumerate(m.get_context()):
         role = "human" if getattr(message, "type", "") == "human" else "ai"
